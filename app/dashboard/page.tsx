@@ -18,8 +18,9 @@ export default async function DashboardPage() {
   return (
     <>
       <Header user={user} />
-      <main className="container dash">
+      <main className="container dash page-in">
         <h1>{heading}</h1>
+        <p className="sub">Selamat datang, {user.name}.</p>
         {user.role === "warga" && <CitizenView />}
         {user.role === "petugas" && (
           <div style={{ marginTop: 18 }}>

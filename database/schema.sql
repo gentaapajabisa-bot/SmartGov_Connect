@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS users (
   UNIQUE KEY uq_users_email (email),
   KEY idx_users_role (role)
 );
-git
+
 CREATE TABLE IF NOT EXISTS categories (
   id          BIGINT       NOT NULL AUTO_INCREMENT,
   name        VARCHAR(80)  NOT NULL,

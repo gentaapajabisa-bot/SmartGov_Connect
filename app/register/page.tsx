@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import AuthForm from "@/components/AuthForm";
+import AuthShell from "@/components/AuthShell";
 import Header from "@/components/Header";
 import { getCurrentUser } from "@/lib/auth";
 
@@ -13,13 +14,9 @@ export default async function RegisterPage() {
   return (
     <>
       <Header />
-      <main className="auth-wrap">
-        <div className="card auth-card">
-          <h1 style={{ fontSize: "1.4rem" }}>Daftar Warga</h1>
-          <p style={{ color: "var(--muted)" }}>Akun petugas dan admin dibuat oleh admin kelurahan.</p>
-          <AuthForm mode="register" />
-        </div>
-      </main>
+      <AuthShell heading="Daftar Warga" blurb="Akun petugas dan admin dibuat oleh admin kelurahan.">
+        <AuthForm mode="register" />
+      </AuthShell>
     </>
   );
 }

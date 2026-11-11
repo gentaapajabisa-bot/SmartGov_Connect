@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import AuthForm from "@/components/AuthForm";
+import AuthShell from "@/components/AuthShell";
 import Header from "@/components/Header";
 import { getCurrentUser } from "@/lib/auth";
 
@@ -13,13 +14,9 @@ export default async function LoginPage() {
   return (
     <>
       <Header />
-      <main className="auth-wrap">
-        <div className="card auth-card">
-          <h1 style={{ fontSize: "1.4rem" }}>Masuk</h1>
-          <p style={{ color: "var(--muted)" }}>Gunakan akun warga, petugas, atau admin.</p>
-          <AuthForm mode="login" />
-        </div>
-      </main>
+      <AuthShell heading="Masuk" blurb="Gunakan akun warga, petugas, atau admin.">
+        <AuthForm mode="login" />
+      </AuthShell>
     </>
   );
 }
