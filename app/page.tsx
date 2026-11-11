@@ -1,5 +1,4 @@
 import Link from "next/link";
-import CityScape from "@/components/CityScape";
 import Header from "@/components/Header";
 import { getCurrentUser } from "@/lib/auth";
 import type { SessionUser } from "@/lib/types";
@@ -78,10 +77,6 @@ export default async function Home() {
               </li>
             </ul>
           </aside>
-        </div>
-
-        <div className="hero-skyline" aria-hidden="true">
-          <CityScape />
         </div>
       </section>
 

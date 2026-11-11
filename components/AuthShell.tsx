@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import CityScape from "./CityScape";
 
 // Tata letak halaman masuk/daftar: panel kota di kiri (disembunyikan di layar kecil), form di kanan.
 export default function AuthShell({
@@ -21,7 +20,6 @@ export default function AuthShell({
           </h2>
           <p>Laporkan masalah lingkungan, dapatkan nomor tiket, dan pantau tindak lanjutnya secara transparan.</p>
         </div>
-        <CityScape />
       </section>
       <section className="auth-panel">
         <div className="card auth-card page-in">
