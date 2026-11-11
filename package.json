@@ -1,0 +1,33 @@
+{
+  "name": "smartgov-connect",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SmartGov Connect - platform pengaduan warga untuk kelurahan",
+  "engines": {
+    "node": ">=20.6"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "db:init": "node --env-file=.env.local scripts/init-db.mjs",
+    "db:seed-admin": "node --env-file=.env.local scripts/seed-admin.mjs"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "jose": "^5.9.6",
+    "mysql2": "^3.11.5",
+    "next": "^14.2.25",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20.17.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "typescript": "^5.6.3"
+  }
+}
