@@ -46,6 +46,7 @@ interface UserRow extends RowDataPacket {
   email: string;
   role: Role;
   is_active: number;
+  email_verified_at: Date | null;
 }
 
 /**
@@ -62,12 +63,12 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
     if (!Number.isInteger(id) || id <= 0) return null;
 
     const rows = await query<UserRow>(
-      "SELECT id, name, email, role, is_active FROM users WHERE id = ? LIMIT 1",
+      "SELECT id, name, email, role, is_active, email_verified_at FROM users WHERE id = ? LIMIT 1",
       [id]
     );
     const row = rows[0];
     if (!row || !row.is_active) return null;
-    return { id: row.id, name: row.name, email: row.email, role: row.role };
+    return { id: row.id, name: row.name, email: row.email, role: row.role, email_verified: row.email_verified_at !== null };
   } catch {
     return null;
   }

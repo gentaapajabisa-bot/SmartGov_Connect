@@ -134,7 +134,7 @@ export default async function Home() {
       </section>
 
       <footer className="site-footer">
-        <div className="container">SmartGov Connect &middot; Platform pengaduan warga</div>
+        <div className="container">SmartGov Connect &middot; Platform pengaduan warga &middot; <Link href="/privasi">Kebijakan Privasi</Link></div>
       </footer>
     </>
   );

@@ -21,7 +21,11 @@ Tiga jenis pengguna: **Warga**, **Petugas Kelurahan**, **Admin**.
 | Notifikasi dalam aplikasi (lonceng) saat status, catatan, atau penugasan berubah | Sudah ada |
 | Penugasan laporan: admin menugaskan petugas, petugas dapat mengambil/melepas | Sudah ada |
 | Analitik: filter periode dan kategori, rata-rata waktu penyelesaian, beban kerja petugas, ekspor CSV | Sudah ada |
-| Notifikasi email/WhatsApp (selain dalam aplikasi), pembatasan percobaan login (rate limit), reset kata sandi | Belum ada |
+| Pembatasan percobaan (login, daftar, lupa sandi) berbasis database | Sudah ada |
+| Reset kata sandi dan verifikasi email (via Resend; opsional) | Sudah ada |
+| Kebijakan privasi (templat) dan persetujuan saat mendaftar | Sudah ada |
+| Log audit tindakan admin (pengguna dan kategori) | Sudah ada |
+| Notifikasi email/WhatsApp untuk status laporan | Belum ada |
 
 > Catatan pengujian: kode ini sudah lolos pemeriksaan sintaks, tetapi **belum pernah dijalankan** terhadap database TiDB sungguhan karena paket npm tidak dapat dipasang di lingkungan pembuatnya. Jalankan langkah di bawah dan laporkan galat bila ada.
 
@@ -119,3 +123,10 @@ middleware.ts      gerbang awal untuk /dashboard
 **Migrasi database (wajib bila sebelumnya sudah memakai versi lama):** jalankan `npm run db:migrate` (aman diulang) atau tempelkan `database/schema.sql` di SQL Editor TiDB, lalu `npm install` untuk paket peta.
 
 **Lainnya:** notifikasi email/WhatsApp, reset kata sandi, dan SLA waktu penanganan.
+
+## Email (Resend)
+
+1. Daftar di https://resend.com dan buat API key.
+2. Di Vercel (Settings, Environment Variables) tambahkan `RESEND_API_KEY`, `APP_URL` (mis. `https://smartgovconnect.vercel.app`), dan opsional `MAIL_FROM`.
+3. Tanpa domain terverifikasi, Resend hanya mengirim ke email pemilik akun Resend. Untuk warga umum, verifikasi domain Anda di Resend.
+4. Tanpa `RESEND_API_KEY`, aplikasi tetap berjalan tetapi email tidak terkirim.

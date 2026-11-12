@@ -1,6 +1,7 @@
 import type { RowDataPacket } from "mysql2";
 import { requireUser } from "@/lib/auth";
 import { pool, query } from "@/lib/db";
+import { audit } from "@/lib/audit";
 import { HttpError, ok, parseId, readJson, run } from "@/lib/http";
 import { adminUserPatchSchema } from "@/lib/validation";
 
@@ -30,6 +31,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       params2.push(data.is_active ? 1 : 0);
     }
     await pool().query(`UPDATE users SET ${sets.join(", ")} WHERE id = ?`, [...params2, id]);
+    await audit(admin.id, "user.update", { type: "user", id }, [data.role !== undefined && `peran=${data.role}`, data.is_active !== undefined && `aktif=${data.is_active}`].filter(Boolean).join(", "));
     return ok({ success: true });
   });
 }

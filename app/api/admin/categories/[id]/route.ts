@@ -1,12 +1,13 @@
 import { requireUser } from "@/lib/auth";
 import { isDuplicate, pool } from "@/lib/db";
+import { audit } from "@/lib/audit";
 import { HttpError, ok, parseId, readJson, run } from "@/lib/http";
 import { categoryPatchSchema } from "@/lib/validation";
 
 // Kategori tidak dihapus agar riwayat laporan tetap utuh; cukup dinonaktifkan.
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   return run(async () => {
-    await requireUser(["admin"]);
+    const admin = await requireUser(["admin"]);
     const id = parseId(params.id);
     const data = categoryPatchSchema.parse(await readJson(req));
 
@@ -35,6 +36,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       if (isDuplicate(err)) throw new HttpError(409, "Nama kategori sudah ada.");
       throw err;
     }
+    await audit(admin.id, "category.update", { type: "category", id }, Object.keys(data).join(", "));
     return ok({ success: true });
   });
 }

@@ -25,6 +25,7 @@ export interface SessionUser {
   name: string;
   email: string;
   role: Role;
+  email_verified: boolean;
 }
 
 export interface Category {

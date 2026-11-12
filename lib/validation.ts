@@ -19,7 +19,20 @@ const phone = z
 
 const name = z.string().trim().min(3, "Nama minimal 3 karakter.").max(100, "Nama maksimal 100 karakter.");
 
-export const registerSchema = z.object({ name, email, phone, password });
+export const registerSchema = z.object({
+  name,
+  email,
+  phone,
+  password,
+  consent: z.literal(true, { errorMap: () => ({ message: "Anda harus menyetujui kebijakan privasi untuk mendaftar." }) }),
+});
+
+export const forgotSchema = z.object({ email });
+export const tokenSchema = z.object({ token: z.string().min(10, "Tautan tidak valid.").max(100, "Tautan tidak valid.") });
+export const resetSchema = z.object({
+  token: z.string().min(10, "Tautan tidak valid.").max(100, "Tautan tidak valid."),
+  password,
+});
 
 export const loginSchema = z.object({
   email,

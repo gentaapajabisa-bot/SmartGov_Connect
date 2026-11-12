@@ -14,7 +14,7 @@ import ReportBrowser from "./ReportBrowser";
 import ReportMap from "./ReportMap";
 import { api, formatDate } from "./ui";
 
-type Tab = "reports" | "map" | "stats" | "users" | "categories";
+type Tab = "reports" | "map" | "stats" | "users" | "categories" | "audit";
 
 export default function AdminPanel({ currentUserId }: { currentUserId: number }) {
   const [tab, setTab] = useState<Tab>("reports");
@@ -24,6 +24,7 @@ export default function AdminPanel({ currentUserId }: { currentUserId: number })
     ["stats", "Statistik"],
     ["users", "Pengguna"],
     ["categories", "Kategori"],
+    ["audit", "Log audit"],
   ];
 
   return (
@@ -40,6 +41,7 @@ export default function AdminPanel({ currentUserId }: { currentUserId: number })
       {tab === "stats" && <StatsView />}
       {tab === "users" && <UsersView currentUserId={currentUserId} />}
       {tab === "categories" && <CategoriesView />}
+      {tab === "audit" && <AuditView />}
     </>
   );
 }
@@ -179,6 +181,54 @@ function StatsView() {
         )}
       </div>
     </>
+  );
+}
+
+/* ---------------- Log audit ---------------- */
+
+interface AuditEntry {
+  id: number;
+  actor: string | null;
+  action: string;
+  target_type: string | null;
+  target_id: number | null;
+  detail: string | null;
+  created_at: string;
+}
+
+function AuditView() {
+  const [entries, setEntries] = useState<AuditEntry[] | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    api<{ entries: AuditEntry[] }>("/api/admin/audit")
+      .then((d) => setEntries(d.entries))
+      .catch((e: Error) => setError(e.message));
+  }, []);
+
+  if (error) return <div className="alert alert-error">{error}</div>;
+  if (!entries) return <div className="empty">Memuat log...</div>;
+  if (entries.length === 0) return <div className="empty">Belum ada tindakan admin yang tercatat.</div>;
+  return (
+    <div className="card" style={{ overflowX: "auto" }}>
+      <h3>200 tindakan terakhir</h3>
+      <table className="table">
+        <thead>
+          <tr><th>Waktu</th><th>Admin</th><th>Tindakan</th><th>Target</th><th>Keterangan</th></tr>
+        </thead>
+        <tbody>
+          {entries.map((e) => (
+            <tr key={e.id}>
+              <td>{formatDate(e.created_at)}</td>
+              <td>{e.actor ?? "-"}</td>
+              <td>{e.action}</td>
+              <td>{e.target_type ? `${e.target_type}${e.target_id ? ` #${e.target_id}` : ""}` : "-"}</td>
+              <td>{e.detail ?? ""}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

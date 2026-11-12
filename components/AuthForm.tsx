@@ -37,7 +37,9 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
     setError("");
     setDone(false);
     setLoading(true);
-    const body = Object.fromEntries(new FormData(e.currentTarget).entries());
+    const fd = new FormData(e.currentTarget);
+    const body: Record<string, unknown> = Object.fromEntries(fd.entries());
+    if (isRegister) body.consent = fd.get("consent") === "on";
     try {
       // Permintaan nyata dan jeda minimum berjalan bersamaan.
       await Promise.all([
@@ -89,7 +91,19 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
             required
           />
           {isRegister && <span className="hint">Minimal 8 karakter, memuat huruf dan angka.</span>}
+          {!isRegister && (
+            <span className="hint"><Link href="/forgot-password">Lupa kata sandi?</Link></span>
+          )}
         </div>
+
+        {isRegister && (
+          <label className="check" style={{ marginBottom: 14 }}>
+            <input type="checkbox" name="consent" />
+            <span>
+              Saya telah membaca dan menyetujui <Link href="/privasi" target="_blank">Kebijakan Privasi</Link>.
+            </span>
+          </label>
+        )}
 
         <button className="btn" type="submit" disabled={loading} style={{ width: "100%" }}>
           {isRegister ? "Daftar sebagai Warga" : "Masuk"}

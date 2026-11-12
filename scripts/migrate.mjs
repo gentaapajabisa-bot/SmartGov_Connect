@@ -1,6 +1,6 @@
 // Migrasi untuk database yang SUDAH dibuat dengan versi lama.
 // Aman dijalankan berulang kali. Pemakaian: npm run db:migrate
-//  - membuat tabel baru (report_photos, notifications) bila belum ada
+//  - membuat tabel baru (report_photos, notifications, auth_tokens, rate_limits, audit_log) bila belum ada
 //  - menambah kolom reports.assigned_to dan indeksnya bila belum ada
 import { readFile } from "node:fs/promises";
 import mysql from "mysql2/promise";
@@ -58,6 +58,19 @@ try {
   if (!(await indexExists("reports", "idx_reports_assigned"))) {
     await conn.query("ALTER TABLE reports ADD KEY idx_reports_assigned (assigned_to, status)");
     console.log("Indeks idx_reports_assigned ditambahkan.");
+  }
+
+  // Kolom baru pada users (tahap keamanan). Akun yang sudah ada dianggap terverifikasi
+  // dan dianggap sudah menyetujui saat mendaftar, agar tidak tiba-tiba terkunci/terganggu.
+  if (!(await columnExists("users", "email_verified_at"))) {
+    await conn.query("ALTER TABLE users ADD COLUMN email_verified_at TIMESTAMP NULL");
+    await conn.query("UPDATE users SET email_verified_at = created_at");
+    console.log("Kolom users.email_verified_at ditambahkan.");
+  }
+  if (!(await columnExists("users", "consent_at"))) {
+    await conn.query("ALTER TABLE users ADD COLUMN consent_at TIMESTAMP NULL");
+    await conn.query("UPDATE users SET consent_at = created_at");
+    console.log("Kolom users.consent_at ditambahkan.");
   }
   console.log("Migrasi selesai.");
 } finally {

@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash VARCHAR(100) NOT NULL,
   role          ENUM('warga','petugas','admin') NOT NULL DEFAULT 'warga',
   is_active     TINYINT(1)   NOT NULL DEFAULT 1,
+  email_verified_at TIMESTAMP NULL,
+  consent_at    TIMESTAMP    NULL,
   created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -91,6 +93,41 @@ CREATE TABLE IF NOT EXISTS notifications (
   created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY idx_notif_user (user_id, is_read, created_at)
+);
+
+-- Token sekali pakai untuk reset kata sandi dan verifikasi email. Hanya hash-nya yang disimpan.
+CREATE TABLE IF NOT EXISTS auth_tokens (
+  id         BIGINT      NOT NULL AUTO_INCREMENT,
+  user_id    BIGINT      NOT NULL,
+  kind       VARCHAR(20) NOT NULL,
+  token_hash CHAR(64)    NOT NULL,
+  expires_at TIMESTAMP   NOT NULL,
+  used_at    TIMESTAMP   NULL,
+  created_at TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_tokens_hash (token_hash),
+  KEY idx_tokens_user (user_id, kind)
+);
+
+-- Penghitung pembatasan percobaan (login, daftar, lupa kata sandi).
+CREATE TABLE IF NOT EXISTS rate_limits (
+  k        CHAR(64)  NOT NULL,
+  hits     INT       NOT NULL DEFAULT 0,
+  reset_at TIMESTAMP NOT NULL,
+  PRIMARY KEY (k)
+);
+
+-- Catatan audit tindakan admin.
+CREATE TABLE IF NOT EXISTS audit_log (
+  id          BIGINT       NOT NULL AUTO_INCREMENT,
+  actor_id    BIGINT       NOT NULL,
+  action      VARCHAR(50)  NOT NULL,
+  target_type VARCHAR(30)  NULL,
+  target_id   BIGINT       NULL,
+  detail      VARCHAR(500) NULL,
+  created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_audit_created (created_at)
 );
 
 -- Kategori awal (aman dijalankan berulang)
