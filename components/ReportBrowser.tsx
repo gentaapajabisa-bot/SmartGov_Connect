@@ -1,13 +1,24 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { STATUSES, STATUS_LABEL, type ReportSummary, type Role } from "@/lib/types";
+import { STATUSES, STATUS_LABEL, type Category, type ReportSummary, type Role } from "@/lib/types";
 import ReportDetail from "./ReportDetail";
 import { StatusBadge, api, formatDate } from "./ui";
 
-export default function ReportBrowser({ role, refreshKey = 0 }: { role: Role; refreshKey?: number }) {
+export default function ReportBrowser({
+  role,
+  userId = 0,
+  refreshKey = 0,
+}: {
+  role: Role;
+  userId?: number;
+  refreshKey?: number;
+}) {
   const [items, setItems] = useState<ReportSummary[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [status, setStatus] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [assigned, setAssigned] = useState("");
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -15,12 +26,20 @@ export default function ReportBrowser({ role, refreshKey = 0 }: { role: Role; re
   const [tick, setTick] = useState(0);
   const isStaff = role !== "warga";
 
+  useEffect(() => {
+    api<{ categories: Category[] }>("/api/categories")
+      .then((d) => setCategories(d.categories))
+      .catch(() => setCategories([]));
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
       const params = new URLSearchParams();
       if (status) params.set("status", status);
+      if (categoryId) params.set("category_id", categoryId);
+      if (isStaff && assigned) params.set("assigned", assigned);
       if (q.trim()) params.set("q", q.trim());
       const d = await api<{ reports: ReportSummary[] }>(`/api/reports?${params.toString()}`);
       setItems(d.reports);
@@ -29,7 +48,7 @@ export default function ReportBrowser({ role, refreshKey = 0 }: { role: Role; re
     } finally {
       setLoading(false);
     }
-  }, [status, q]);
+  }, [status, categoryId, assigned, q, isStaff]);
 
   useEffect(() => {
     const t = setTimeout(load, 250); // jeda singkat saat mengetik pencarian
@@ -52,6 +71,19 @@ export default function ReportBrowser({ role, refreshKey = 0 }: { role: Role; re
             <option key={s} value={s}>{STATUS_LABEL[s]}</option>
           ))}
         </select>
+        <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} aria-label="Filter kategori">
+          <option value="">Semua kategori</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+        {isStaff && (
+          <select value={assigned} onChange={(e) => setAssigned(e.target.value)} aria-label="Filter penugasan">
+            <option value="">Semua penugasan</option>
+            <option value="me">Ditugaskan ke saya</option>
+            <option value="none">Belum ditugaskan</option>
+          </select>
+        )}
       </div>
 
       {error && <div className="alert alert-error" role="alert">{error}</div>}
@@ -79,6 +111,7 @@ export default function ReportBrowser({ role, refreshKey = 0 }: { role: Role; re
               <div className="sub">
                 {r.category_name} &middot; {formatDate(r.created_at)}
                 {isStaff && ` · ${r.reporter_name ?? "Anonim"}`}
+                {isStaff && ` · ${r.assigned_name ? `Petugas: ${r.assigned_name}` : "Belum ditugaskan"}`}
               </div>
             </button>
           ))}
@@ -86,7 +119,7 @@ export default function ReportBrowser({ role, refreshKey = 0 }: { role: Role; re
 
         <div>
           {selected ? (
-            <ReportDetail id={selected} role={role} onChanged={() => setTick((n) => n + 1)} />
+            <ReportDetail id={selected} role={role} userId={userId} onChanged={() => setTick((n) => n + 1)} />
           ) : (
             <div className="empty">Pilih laporan di sebelah kiri untuk melihat detail dan riwayat status.</div>
           )}

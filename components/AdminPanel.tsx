@@ -11,14 +11,16 @@ import {
   type Stats,
 } from "@/lib/types";
 import ReportBrowser from "./ReportBrowser";
+import ReportMap from "./ReportMap";
 import { api, formatDate } from "./ui";
 
-type Tab = "reports" | "stats" | "users" | "categories";
+type Tab = "reports" | "map" | "stats" | "users" | "categories";
 
 export default function AdminPanel({ currentUserId }: { currentUserId: number }) {
   const [tab, setTab] = useState<Tab>("reports");
   const tabs: [Tab, string][] = [
     ["reports", "Laporan"],
+    ["map", "Peta"],
     ["stats", "Statistik"],
     ["users", "Pengguna"],
     ["categories", "Kategori"],
@@ -33,7 +35,8 @@ export default function AdminPanel({ currentUserId }: { currentUserId: number })
           </button>
         ))}
       </div>
-      {tab === "reports" && <ReportBrowser role="admin" />}
+      {tab === "reports" && <ReportBrowser role="admin" userId={currentUserId} />}
+      {tab === "map" && <ReportMap role="admin" userId={currentUserId} />}
       {tab === "stats" && <StatsView />}
       {tab === "users" && <UsersView currentUserId={currentUserId} />}
       {tab === "categories" && <CategoriesView />}
@@ -45,29 +48,73 @@ export default function AdminPanel({ currentUserId }: { currentUserId: number })
 
 function StatsView() {
   const [stats, setStats] = useState<Stats | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [days, setDays] = useState("14");
+  const [categoryId, setCategoryId] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
-    api<{ stats: Stats }>("/api/admin/stats")
-      .then((d) => setStats(d.stats))
-      .catch((e: Error) => setError(e.message));
+    api<{ categories: Category[] }>("/api/categories")
+      .then((d) => setCategories(d.categories))
+      .catch(() => setCategories([]));
   }, []);
 
-  if (error) return <div className="alert alert-error">{error}</div>;
-  if (!stats) return <div className="empty">Memuat statistik...</div>;
+  useEffect(() => {
+    setError("");
+    const p = new URLSearchParams({ days });
+    if (categoryId) p.set("category_id", categoryId);
+    api<{ stats: Stats }>(`/api/admin/stats?${p.toString()}`)
+      .then((d) => setStats(d.stats))
+      .catch((e: Error) => setError(e.message));
+  }, [days, categoryId]);
+
+  const exportHref = `/api/admin/export${categoryId ? `?category_id=${encodeURIComponent(categoryId)}` : ""}`;
+
+  const filters = (
+    <div className="toolbar" style={{ alignItems: "center" }}>
+      <select value={days} onChange={(e) => setDays(e.target.value)} aria-label="Periode">
+        <option value="7">7 hari terakhir</option>
+        <option value="14">14 hari terakhir</option>
+        <option value="30">30 hari terakhir</option>
+        <option value="90">90 hari terakhir</option>
+      </select>
+      <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} aria-label="Kategori">
+        <option value="">Semua kategori</option>
+        {categories.map((c) => (
+          <option key={c.id} value={c.id}>{c.name}</option>
+        ))}
+      </select>
+      <a className="btn btn-light btn-sm" href={exportHref} style={{ marginLeft: "auto" }}>
+        Ekspor CSV
+      </a>
+    </div>
+  );
+
+  if (error) return <>{filters}<div className="alert alert-error">{error}</div></>;
+  if (!stats) return <>{filters}<div className="empty">Memuat statistik...</div></>;
 
   const count = (s: string) => stats.byStatus.find((x) => x.status === s)?.n ?? 0;
   const maxCat = Math.max(1, ...stats.byCategory.map((c) => c.n));
   const maxDaily = Math.max(1, ...stats.daily.map((d) => d.n));
   const open = count("baru") + count("diverifikasi") + count("diproses");
+  const maxLoad = Math.max(1, ...stats.workload.map((w) => w.open + w.done));
+  const avg =
+    stats.avgResolveHours === null
+      ? "-"
+      : stats.avgResolveHours < 48
+        ? `${stats.avgResolveHours.toFixed(1)} jam`
+        : `${(stats.avgResolveHours / 24).toFixed(1)} hari`;
 
   return (
     <>
+      {filters}
       <div className="stat-grid">
         <div className="stat"><div className="n">{stats.totals.reports}</div><div className="l">Total laporan</div></div>
         <div className="stat"><div className="n">{open}</div><div className="l">Masih berjalan</div></div>
         <div className="stat"><div className="n">{count("selesai")}</div><div className="l">Selesai</div></div>
         <div className="stat"><div className="n">{count("ditolak")}</div><div className="l">Ditolak</div></div>
+        <div className="stat"><div className="n">{stats.unassigned}</div><div className="l">Belum ditugaskan</div></div>
+        <div className="stat"><div className="n">{avg}</div><div className="l">Rata-rata penyelesaian</div></div>
         <div className="stat"><div className="n">{stats.totals.users}</div><div className="l">Pengguna</div></div>
       </div>
 
@@ -99,7 +146,7 @@ function StatsView() {
       </div>
 
       <div className="card" style={{ marginTop: 18 }}>
-        <h3>Laporan masuk, 14 hari terakhir</h3>
+        <h3>Laporan masuk, {stats.days} hari terakhir</h3>
         {stats.daily.length === 0 ? (
           <div className="empty">Belum ada laporan pada periode ini.</div>
         ) : (
@@ -109,6 +156,23 @@ function StatsView() {
                 <span>{d.n}</span>
                 <span className="fill" style={{ height: `${(d.n / maxDaily) * 80}px` }} />
                 <span>{d.date.slice(8)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="card" style={{ marginTop: 18 }}>
+        <h3>Beban kerja petugas</h3>
+        {stats.workload.length === 0 ? (
+          <div className="empty">Belum ada laporan yang ditugaskan.</div>
+        ) : (
+          <div className="bars">
+            {stats.workload.map((w) => (
+              <div className="bar-row" key={w.name}>
+                <span>{w.name}</span>
+                <div className="bar"><span style={{ width: `${((w.open + w.done) / maxLoad) * 100}%` }} /></div>
+                <strong>{w.open} aktif / {w.done} selesai</strong>
               </div>
             ))}
           </div>

@@ -1,17 +1,20 @@
 import Link from "next/link";
 import { ROLE_LABEL, type SessionUser } from "@/lib/types";
+import Logo from "./Logo";
 import LogoutButton from "./LogoutButton";
+import NotificationBell from "./NotificationBell";
 
 export default function Header({ user }: { user?: SessionUser | null }) {
   return (
     <header className="site-header">
       <div className="container">
         <Link href="/" className="brand">
-          <span className="brand-mark" aria-hidden="true">S</span>
+          <Logo size={36} />
           SmartGov Connect
         </Link>
         {user ? (
           <div className="header-user">
+            <NotificationBell />
             <span>{user.name}</span>
             <span className="role-chip">{ROLE_LABEL[user.role]}</span>
             <LogoutButton />

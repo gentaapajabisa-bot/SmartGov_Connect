@@ -9,10 +9,20 @@ export interface ReportRow extends RowDataPacket {
   status: Status;
   location_text: string;
   is_anonymous: number;
+  assigned_to: number | null;
   created_at: Date;
   category_name: string;
   reporter_name: string;
+  assigned_name: string | null;
 }
+
+/** Kolom dan JOIN standar untuk daftar/detail laporan. Alias: r=reports, c=categories, u=pelapor, a=petugas. */
+export const REPORT_SELECT = `r.id, r.ticket_no, r.user_id, r.title, r.status, r.location_text, r.is_anonymous,
+  r.assigned_to, r.created_at, c.name AS category_name, u.name AS reporter_name, a.name AS assigned_name`;
+export const REPORT_JOINS = `FROM reports r
+  JOIN categories c ON c.id = r.category_id
+  JOIN users u ON u.id = r.user_id
+  LEFT JOIN users a ON a.id = r.assigned_to`;
 
 /**
  * Perlindungan data pribadi pada tampilan laporan:
@@ -28,6 +38,7 @@ export function visibleReporterName(viewerRole: Role, row: { is_anonymous: numbe
 }
 
 export function toSummary(viewer: SessionUser, row: ReportRow): ReportSummary {
+  const staff = viewer.role !== "warga";
   return {
     id: row.id,
     ticket_no: row.ticket_no,
@@ -37,6 +48,9 @@ export function toSummary(viewer: SessionUser, row: ReportRow): ReportSummary {
     location_text: row.location_text,
     reporter_name: visibleReporterName(viewer.role, row),
     is_anonymous: Boolean(row.is_anonymous),
+    // Nama petugas tidak dibuka ke warga.
+    assigned_to: staff ? row.assigned_to : null,
+    assigned_name: staff ? row.assigned_name : null,
     created_at: new Date(row.created_at).toISOString(),
   };
 }

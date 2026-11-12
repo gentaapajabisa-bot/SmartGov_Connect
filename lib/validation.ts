@@ -50,6 +50,28 @@ export const statusUpdateSchema = z
     path: ["note"],
   });
 
+/** Perubahan laporan oleh staf: status/catatan, penugasan, atau keduanya. */
+export const reportUpdateSchema = z
+  .object({
+    status: z.enum(STATUSES, { errorMap: () => ({ message: "Status tidak valid." }) }).optional(),
+    note: z.string().trim().max(1000, "Catatan maksimal 1000 karakter.").optional(),
+    assigned_to: z.number().int().positive().nullable().optional(),
+  })
+  .refine((d) => d.status !== undefined || d.assigned_to !== undefined || (d.note && d.note.length > 0), {
+    message: "Tidak ada perubahan.",
+  })
+  .refine((d) => d.status !== "ditolak" || (d.note && d.note.length >= 5), {
+    message: "Alasan penolakan wajib diisi (minimal 5 karakter).",
+    path: ["note"],
+  });
+
+export const notificationPatchSchema = z
+  .object({
+    all: z.boolean().optional(),
+    id: z.number().int().positive().optional(),
+  })
+  .refine((d) => d.all === true || d.id !== undefined, { message: "Tidak ada perubahan." });
+
 export const adminUserCreateSchema = z.object({
   name,
   email,

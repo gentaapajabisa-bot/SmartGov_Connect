@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import AdminPanel from "@/components/AdminPanel";
 import CitizenView from "@/components/CitizenView";
 import Header from "@/components/Header";
-import ReportBrowser from "@/components/ReportBrowser";
+import StaffView from "@/components/StaffView";
 import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -22,11 +22,7 @@ export default async function DashboardPage() {
         <h1>{heading}</h1>
         <p className="sub">Selamat datang, {user.name}.</p>
         {user.role === "warga" && <CitizenView />}
-        {user.role === "petugas" && (
-          <div style={{ marginTop: 18 }}>
-            <ReportBrowser role="petugas" />
-          </div>
-        )}
+        {user.role === "petugas" && <StaffView userId={user.id} />}
         {user.role === "admin" && <AdminPanel currentUserId={user.id} />}
       </main>
     </>

@@ -46,13 +46,15 @@ CREATE TABLE IF NOT EXISTS reports (
   status        ENUM('baru','diverifikasi','diproses','selesai','ditolak') NOT NULL DEFAULT 'baru',
   officer_note  TEXT          NULL,
   handled_by    BIGINT        NULL,
+  assigned_to   BIGINT        NULL,  -- petugas yang ditugaskan menangani laporan
   created_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_reports_ticket (ticket_no),
   KEY idx_reports_user (user_id, created_at),
   KEY idx_reports_status (status, created_at),
-  KEY idx_reports_category (category_id)
+  KEY idx_reports_category (category_id),
+  KEY idx_reports_assigned (assigned_to, status)
 );
 
 CREATE TABLE IF NOT EXISTS report_status_history (
@@ -64,6 +66,31 @@ CREATE TABLE IF NOT EXISTS report_status_history (
   created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY idx_history_report (report_id, created_at)
+);
+
+-- Foto bukti laporan. Disimpan di database (sudah dikompres di sisi klien) dan hanya
+-- disajikan lewat API yang memeriksa hak akses, jadi tidak ada URL publik.
+CREATE TABLE IF NOT EXISTS report_photos (
+  id         BIGINT      NOT NULL AUTO_INCREMENT,
+  report_id  BIGINT      NOT NULL,
+  mime       VARCHAR(30) NOT NULL DEFAULT 'image/jpeg',
+  size_bytes INT         NOT NULL,
+  data       MEDIUMBLOB  NOT NULL,
+  created_at TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_photos_report (report_id)
+);
+
+-- Notifikasi di dalam aplikasi (perubahan status, penugasan).
+CREATE TABLE IF NOT EXISTS notifications (
+  id         BIGINT       NOT NULL AUTO_INCREMENT,
+  user_id    BIGINT       NOT NULL,
+  report_id  BIGINT       NULL,
+  message    VARCHAR(255) NOT NULL,
+  is_read    TINYINT(1)   NOT NULL DEFAULT 0,
+  created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_notif_user (user_id, is_read, created_at)
 );
 
 -- Kategori awal (aman dijalankan berulang)

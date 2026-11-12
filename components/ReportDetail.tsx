@@ -1,16 +1,18 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { STATUSES, STATUS_LABEL, type ReportDetailData, type Role, type Status } from "@/lib/types";
+import { STATUSES, STATUS_LABEL, type ReportDetailData, type Role, type StaffUser, type Status } from "@/lib/types";
 import { StatusBadge, api, formatDate } from "./ui";
 
 export default function ReportDetail({
   id,
   role,
+  userId = 0,
   onChanged,
 }: {
   id: number;
   role: Role;
+  userId?: number;
   onChanged: () => void;
 }) {
   const [report, setReport] = useState<ReportDetailData | null>(null);
@@ -18,6 +20,8 @@ export default function ReportDetail({
   const [saved, setSaved] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<Status>("baru");
+  const [staff, setStaff] = useState<StaffUser[]>([]);
+  const [assignee, setAssignee] = useState("");
   const isStaff = role === "petugas" || role === "admin";
 
   const load = useCallback(async () => {
@@ -26,6 +30,7 @@ export default function ReportDetail({
       const d = await api<{ report: ReportDetailData }>(`/api/reports/${id}`);
       setReport(d.report);
       setStatus(d.report.status);
+      setAssignee(d.report.assigned_to ? String(d.report.assigned_to) : "");
     } catch (e) {
       setReport(null);
       setError((e as Error).message);
@@ -37,24 +42,38 @@ export default function ReportDetail({
     load();
   }, [load]);
 
-  async function onSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  // Admin memilih petugas dari daftar; petugas biasa hanya bisa mengambil/melepas untuk dirinya.
+  useEffect(() => {
+    if (role !== "admin") return;
+    api<{ staff: StaffUser[] }>("/api/staff")
+      .then((d) => setStaff(d.staff))
+      .catch(() => setStaff([]));
+  }, [role]);
+
+  async function patch(body: { status?: Status; note?: string; assigned_to?: number | null }, okMsg: string) {
     setError("");
     setSaved("");
     setBusy(true);
-    const form = e.currentTarget;
-    const note = String(new FormData(form).get("note") ?? "");
     try {
-      await api(`/api/reports/${id}`, { method: "PATCH", body: { status, note } });
-      form.reset();
-      setSaved("Perubahan tersimpan.");
+      await api(`/api/reports/${id}`, { method: "PATCH", body });
+      setSaved(okMsg);
       await load();
       onChanged();
+      return true;
     } catch (err) {
       setError((err as Error).message);
+      return false;
     } finally {
       setBusy(false);
     }
+  }
+
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const note = String(new FormData(form).get("note") ?? "");
+    const okay = await patch({ status, note }, "Perubahan tersimpan. Pelapor akan menerima notifikasi.");
+    if (okay) form.reset();
   }
 
   if (error && !report) return <div className="card"><div className="alert alert-error">{error}</div></div>;
@@ -62,6 +81,7 @@ export default function ReportDetail({
 
   const closed = report.status === "selesai" || report.status === "ditolak";
   const canEdit = isStaff && (!closed || role === "admin");
+  const mine = report.assigned_to === userId && userId > 0;
 
   return (
     <div className="card detail">
@@ -71,6 +91,22 @@ export default function ReportDetail({
       </div>
       <h2 style={{ marginTop: 8 }}>{report.title}</h2>
       <p style={{ whiteSpace: "pre-wrap" }}>{report.description}</p>
+
+      {report.photos.length > 0 && (
+        <ul className="thumbs thumbs-lg" aria-label="Foto laporan">
+          {report.photos.map((p, i) => {
+            const src = `/api/reports/${report.id}/photos/${p.id}`;
+            return (
+              <li key={p.id}>
+                <a href={src} target="_blank" rel="noopener noreferrer" title="Buka ukuran penuh">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={src} alt={`Foto laporan ${i + 1}`} loading="lazy" />
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      )}
 
       <dl>
         <dt>Kategori</dt>
@@ -95,6 +131,8 @@ export default function ReportDetail({
           <>
             <dt>Pelapor</dt>
             <dd>{report.reporter_name ?? (report.is_anonymous ? "Anonim (disembunyikan)" : "-")}</dd>
+            <dt>Petugas</dt>
+            <dd>{report.assigned_name ?? "Belum ditugaskan"}</dd>
           </>
         )}
         <dt>Dilaporkan</dt>
@@ -117,6 +155,42 @@ export default function ReportDetail({
           </li>
         ))}
       </ul>
+
+      {isStaff && canEdit && (
+        <div className="panel">
+          <h3 style={{ fontSize: "1rem" }}>Penugasan</h3>
+          {role === "admin" ? (
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+              <select
+                value={assignee}
+                onChange={(e) => setAssignee(e.target.value)}
+                aria-label="Pilih petugas"
+                style={{ flex: "1 1 200px", width: "auto" }}
+              >
+                <option value="">Belum ditugaskan</option>
+                {staff.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}{s.role === "admin" ? " (admin)" : ""}</option>
+                ))}
+              </select>
+              <button
+                className="btn btn-sm"
+                disabled={busy || assignee === (report.assigned_to ? String(report.assigned_to) : "")}
+                onClick={() => patch({ assigned_to: assignee ? Number(assignee) : null }, "Penugasan diperbarui.")}
+              >
+                Simpan penugasan
+              </button>
+            </div>
+          ) : mine ? (
+            <button className="btn btn-light btn-sm" disabled={busy} onClick={() => patch({ assigned_to: null }, "Penugasan dilepas.")}>
+              Lepas penugasan saya
+            </button>
+          ) : (
+            <button className="btn btn-sm" disabled={busy || userId <= 0} onClick={() => patch({ assigned_to: userId }, "Laporan kini ditugaskan kepada Anda.")}>
+              {report.assigned_to ? "Ambil alih laporan ini" : "Ambil laporan ini"}
+            </button>
+          )}
+        </div>
+      )}
 
       {isStaff && (
         <form onSubmit={onSubmit} className="panel">

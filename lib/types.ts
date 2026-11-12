@@ -44,6 +44,37 @@ export interface ReportSummary {
   /** null bila pelapor anonim (bagi petugas) atau bila pelihat adalah pelapor sendiri */
   reporter_name: string | null;
   is_anonymous: boolean;
+  /** Hanya diisi untuk petugas/admin; warga selalu null. */
+  assigned_to: number | null;
+  assigned_name: string | null;
+  created_at: string;
+}
+
+export interface PhotoRef {
+  id: number;
+}
+
+export interface StaffUser {
+  id: number;
+  name: string;
+  role: Role;
+}
+
+export interface MapPoint {
+  id: number;
+  ticket_no: string;
+  title: string;
+  status: Status;
+  category_name: string;
+  latitude: number;
+  longitude: number;
+}
+
+export interface NotificationItem {
+  id: number;
+  report_id: number | null;
+  message: string;
+  is_read: boolean;
   created_at: string;
 }
 
@@ -62,6 +93,7 @@ export interface ReportDetailData extends ReportSummary {
   officer_note: string | null;
   updated_at: string;
   history: HistoryItem[];
+  photos: PhotoRef[];
 }
 
 export interface AdminUser {
@@ -75,6 +107,12 @@ export interface AdminUser {
 }
 
 export interface Stats {
+  days: number;
+  categoryId: number | null;
+  /** Rata-rata jam dari laporan masuk sampai pertama kali berstatus selesai; null bila belum ada. */
+  avgResolveHours: number | null;
+  unassigned: number;
+  workload: { name: string; open: number; done: number }[];
   totals: { reports: number; users: number };
   byStatus: { status: Status; n: number }[];
   byCategory: { name: string; n: number }[];

@@ -16,9 +16,12 @@ Tiga jenis pengguna: **Warga**, **Petugas Kelurahan**, **Admin**.
 | Admin: kelola pengguna, peran, kategori, lihat statistik | Sudah ada |
 | Pembatasan akses berdasarkan peran (dicek di server pada setiap API) | Sudah ada |
 | Opsi lapor anonim terhadap petugas | Sudah ada |
-| **Unggah foto** | **Belum aktif** (kolom `photo_url` sudah disiapkan; perlu Vercel Blob atau penyimpanan lain) |
-| **Peta interaktif** | **Belum aktif** (saat ini hanya tautan ke OpenStreetMap bila koordinat ada) |
-| Notifikasi email/WhatsApp, pembatasan percobaan login (rate limit), reset kata sandi | Belum ada |
+| Unggah foto laporan (maks. 3, dikompres di peramban, disimpan di TiDB, hanya dapat dibuka oleh pihak berwenang) | Sudah ada |
+| Peta interaktif: pilih lokasi di peta saat melapor; peta sebaran laporan untuk petugas/admin | Sudah ada |
+| Notifikasi dalam aplikasi (lonceng) saat status, catatan, atau penugasan berubah | Sudah ada |
+| Penugasan laporan: admin menugaskan petugas, petugas dapat mengambil/melepas | Sudah ada |
+| Analitik: filter periode dan kategori, rata-rata waktu penyelesaian, beban kerja petugas, ekspor CSV | Sudah ada |
+| Notifikasi email/WhatsApp (selain dalam aplikasi), pembatasan percobaan login (rate limit), reset kata sandi | Belum ada |
 
 > Catatan pengujian: kode ini sudah lolos pemeriksaan sintaks, tetapi **belum pernah dijalankan** terhadap database TiDB sungguhan karena paket npm tidak dapat dipasang di lingkungan pembuatnya. Jalankan langkah di bawah dan laporkan galat bila ada.
 
@@ -109,15 +112,10 @@ middleware.ts      gerbang awal untuk /dashboard
 
 ## Langkah pengembangan berikutnya
 
-**Unggah foto (Vercel Blob)**
-1. Aktifkan Blob di dashboard Vercel, tambahkan `BLOB_READ_WRITE_TOKEN`, lalu `npm i @vercel/blob`.
-2. Buat `app/api/reports/photo/route.ts` yang memeriksa peran warga, tipe file (JPEG/PNG/WebP), dan ukuran maksimum, lalu memanggil `put()`.
-3. Simpan URL hasilnya ke `reports.photo_url` dan tampilkan di `ReportDetail`.
-   Jangan menerima URL foto langsung dari klien tanpa melalui unggahan ini.
+**Foto:** disimpan di TiDB (kolom MEDIUMBLOB) agar tidak butuh layanan tambahan. Jika volume foto besar, pindahkan ke penyimpanan objek seperti Vercel Blob.
 
-**Peta interaktif (Leaflet + OpenStreetMap)**
-1. `npm i leaflet react-leaflet` dan `npm i -D @types/leaflet`.
-2. Buat komponen peta dan muat dengan `next/dynamic` (`ssr: false`).
-3. Hubungkan klik peta ke kolom `latitude` dan `longitude` di `ReportForm`. Perhatikan ketentuan penggunaan tile OpenStreetMap atau gunakan penyedia tile sendiri untuk lalu lintas besar.
+**Peta:** memakai tile OpenStreetMap; untuk lalu lintas besar gunakan penyedia tile sendiri sesuai ketentuan OSM.
 
-**Lainnya:** notifikasi status, ekspor laporan ke CSV, penugasan laporan ke petugas tertentu, dan SLA waktu penanganan.
+**Migrasi database (wajib bila sebelumnya sudah memakai versi lama):** jalankan `npm run db:migrate` (aman diulang) atau tempelkan `database/schema.sql` di SQL Editor TiDB, lalu `npm install` untuk paket peta.
+
+**Lainnya:** notifikasi email/WhatsApp, reset kata sandi, dan SLA waktu penanganan.

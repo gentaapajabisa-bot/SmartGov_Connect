@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Logo from "./Logo";
 
 const DEFAULT_STEPS = [
   "Menghubungkan ke jaringan kota...",
@@ -48,7 +49,7 @@ export default function LoadingScreen({
         <span className="ring r1" />
         <span className="ring r2" />
         <span className="ring r3" />
-        <div className="loader-mark">S</div>
+        <Logo size={64} className="loader-logo" />
       </div>
       <div className="loader-title">{title}</div>
       <div className="loader-step" key={stepIndex}>{steps[stepIndex]}</div>
