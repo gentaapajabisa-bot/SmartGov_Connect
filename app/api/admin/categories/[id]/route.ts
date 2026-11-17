@@ -21,6 +21,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       sets.push("description = ?");
       values.push(data.description || null);
     }
+    if (data.sla_hours !== undefined) {
+      sets.push("sla_hours = ?");
+      values.push(data.sla_hours);
+    }
     if (data.is_active !== undefined) {
       sets.push("is_active = ?");
       values.push(data.is_active ? 1 : 0);

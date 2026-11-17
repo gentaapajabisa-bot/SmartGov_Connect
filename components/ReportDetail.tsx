@@ -2,7 +2,8 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { STATUSES, STATUS_LABEL, type ReportDetailData, type Role, type StaffUser, type Status } from "@/lib/types";
-import { StatusBadge, api, formatDate } from "./ui";
+import { compressImage } from "@/lib/image";
+import { SlaBadge, Stars, StatusBadge, api, formatDate } from "./ui";
 
 export default function ReportDetail({
   id,
@@ -22,6 +23,9 @@ export default function ReportDetail({
   const [status, setStatus] = useState<Status>("baru");
   const [staff, setStaff] = useState<StaffUser[]>([]);
   const [assignee, setAssignee] = useState("");
+  const [stars, setStars] = useState(0);
+  const [comment, setComment] = useState("");
+  const [uploading, setUploading] = useState(false);
   const isStaff = role === "petugas" || role === "admin";
 
   const load = useCallback(async () => {
@@ -31,6 +35,8 @@ export default function ReportDetail({
       setReport(d.report);
       setStatus(d.report.status);
       setAssignee(d.report.assigned_to ? String(d.report.assigned_to) : "");
+      setStars(d.report.rating?.stars ?? 0);
+      setComment(d.report.rating?.comment ?? "");
     } catch (e) {
       setReport(null);
       setError((e as Error).message);
@@ -76,6 +82,48 @@ export default function ReportDetail({
     if (okay) form.reset();
   }
 
+  async function sendRating() {
+    if (stars < 1) {
+      setError("Pilih jumlah bintang terlebih dahulu.");
+      return;
+    }
+    setError("");
+    setSaved("");
+    setBusy(true);
+    try {
+      await api(`/api/reports/${id}/rating`, { body: { stars, comment: comment.trim() || undefined } });
+      setSaved("Terima kasih atas penilaian Anda.");
+      await load();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function uploadProof(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setError("");
+    setSaved("");
+    setUploading(true);
+    try {
+      const file = files[0];
+      if (!file.type.startsWith("image/")) throw new Error("Hanya berkas gambar yang dapat diunggah.");
+      const blob = await compressImage(file);
+      const res = await fetch(`/api/reports/${id}/photos`, { method: "POST", headers: { "Content-Type": "image/jpeg" }, body: blob });
+      if (!res.ok) {
+        const d = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(d.error ?? "Gagal mengunggah foto.");
+      }
+      setSaved("Foto bukti penyelesaian diunggah.");
+      await load();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setUploading(false);
+    }
+  }
+
   if (error && !report) return <div className="card"><div className="alert alert-error">{error}</div></div>;
   if (!report) return <div className="card">Memuat...</div>;
 
@@ -92,21 +140,28 @@ export default function ReportDetail({
       <h2 style={{ marginTop: 8 }}>{report.title}</h2>
       <p style={{ whiteSpace: "pre-wrap" }}>{report.description}</p>
 
-      {report.photos.length > 0 && (
-        <ul className="thumbs thumbs-lg" aria-label="Foto laporan">
-          {report.photos.map((p, i) => {
-            const src = `/api/reports/${report.id}/photos/${p.id}`;
-            return (
-              <li key={p.id}>
-                <a href={src} target="_blank" rel="noopener noreferrer" title="Buka ukuran penuh">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={src} alt={`Foto laporan ${i + 1}`} loading="lazy" />
-                </a>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+      {(["report", "proof"] as const).map((kind) => {
+        const list = report.photos.filter((p) => p.kind === kind);
+        if (list.length === 0) return null;
+        return (
+          <div key={kind}>
+            <h3 style={{ fontSize: "0.95rem", marginTop: 14 }}>{kind === "proof" ? "Bukti penyelesaian" : "Foto laporan"}</h3>
+            <ul className="thumbs thumbs-lg" aria-label={kind === "proof" ? "Foto bukti penyelesaian" : "Foto laporan"}>
+              {list.map((p, i) => {
+                const src = `/api/reports/${report.id}/photos/${p.id}`;
+                return (
+                  <li key={p.id}>
+                    <a href={src} target="_blank" rel="noopener noreferrer" title="Buka ukuran penuh">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={src} alt={`${kind === "proof" ? "Bukti penyelesaian" : "Foto laporan"} ${i + 1}`} loading="lazy" />
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        );
+      })}
 
       <dl>
         <dt>Kategori</dt>
@@ -137,6 +192,16 @@ export default function ReportDetail({
         )}
         <dt>Dilaporkan</dt>
         <dd>{formatDate(report.created_at)}</dd>
+        <dt>Target selesai</dt>
+        <dd>
+          {formatDate(report.due_at)} <SlaBadge status={report.status} due_at={report.due_at} overdue={report.overdue} />
+        </dd>
+        {report.votes > 0 && (
+          <>
+            <dt>Dukungan warga</dt>
+            <dd>{report.votes} warga mendukung laporan ini</dd>
+          </>
+        )}
         {report.officer_note && (
           <>
             <dt>Catatan terakhir</dt>
@@ -189,6 +254,60 @@ export default function ReportDetail({
               {report.assigned_to ? "Ambil alih laporan ini" : "Ambil laporan ini"}
             </button>
           )}
+        </div>
+      )}
+
+      {isStaff && canEdit && (report.status === "diproses" || report.status === "selesai") && (role === "admin" || mine) && (
+        <div className="panel">
+          <h3 style={{ fontSize: "1rem" }}>Bukti penyelesaian</h3>
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            disabled={uploading || report.photos.filter((p) => p.kind === "proof").length >= 3}
+            onChange={(e) => {
+              void uploadProof(e.target.files);
+              e.target.value = "";
+            }}
+          />
+          <span className="hint">{uploading ? "Mengunggah..." : "Foto kondisi setelah ditangani (maksimal 3). Terlihat oleh pelapor."}</span>
+        </div>
+      )}
+
+      {role === "warga" && report.status === "selesai" && (
+        <div className="panel">
+          <h3 style={{ fontSize: "1rem" }}>Penilaian Anda</h3>
+          {error && <div className="alert alert-error" role="alert">{error}</div>}
+          {saved && <div className="alert alert-ok" role="status">{saved}</div>}
+          <div className="star-input" role="radiogroup" aria-label="Penilaian bintang">
+            {[1, 2, 3, 4, 5].map((n) => (
+              <button
+                key={n}
+                type="button"
+                role="radio"
+                aria-checked={stars === n}
+                aria-label={`${n} bintang`}
+                className={n <= stars ? "on" : ""}
+                onClick={() => setStars(n)}
+              >
+                ★
+              </button>
+            ))}
+          </div>
+          <div className="field" style={{ marginTop: 10 }}>
+            <label htmlFor="rating-comment">Komentar (opsional)</label>
+            <textarea id="rating-comment" value={comment} maxLength={500} onChange={(e) => setComment(e.target.value)} placeholder="Bagaimana penanganannya?" />
+          </div>
+          <button className="btn btn-sm" type="button" onClick={sendRating} disabled={busy}>
+            {report.rating ? "Perbarui penilaian" : "Kirim penilaian"}
+          </button>
+        </div>
+      )}
+
+      {isStaff && report.rating && (
+        <div className="panel">
+          <h3 style={{ fontSize: "1rem" }}>Penilaian pelapor</h3>
+          <Stars value={report.rating.stars} />
+          {report.rating.comment && <p style={{ marginTop: 6 }}>{report.rating.comment}</p>}
         </div>
       )}
 

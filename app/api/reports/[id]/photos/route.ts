@@ -6,21 +6,33 @@ import { HttpError, ok, parseId, run } from "@/lib/http";
 const MAX_BYTES = 800 * 1024; // klien mengompres ke JPEG <= ~600 KB; batas server lebih longgar
 const MAX_PHOTOS = 3;
 
-// Warga pemilik laporan mengunggah foto bukti (JPEG mentah di body permintaan).
+// Warga pemilik laporan mengunggah foto laporan; petugas yang ditugaskan (atau admin) mengunggah
+// foto bukti penyelesaian. Isi permintaan berupa JPEG mentah.
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   return run(async () => {
-    const user = await requireUser(["warga"]);
+    const user = await requireUser();
     const reportId = parseId(params.id);
+    const staff = user.role !== "warga";
+    const kind = staff ? "proof" : "report";
 
-    const owned = await query<RowDataPacket>("SELECT id FROM reports WHERE id = ? AND user_id = ? LIMIT 1", [
-      reportId,
-      user.id,
-    ]);
-    if (!owned[0]) throw new HttpError(404, "Laporan tidak ditemukan.");
+    const found = await query<RowDataPacket & { user_id: number; status: string; assigned_to: number | null }>(
+      "SELECT user_id, status, assigned_to FROM reports WHERE id = ? LIMIT 1",
+      [reportId]
+    );
+    const rep = found[0];
+    if (!rep || (!staff && rep.user_id !== user.id)) throw new HttpError(404, "Laporan tidak ditemukan.");
+    if (staff) {
+      if (user.role === "petugas" && rep.assigned_to !== user.id) {
+        throw new HttpError(403, "Hanya petugas yang ditugaskan (atau admin) yang dapat mengunggah bukti penyelesaian.");
+      }
+      if (rep.status !== "diproses" && rep.status !== "selesai") {
+        throw new HttpError(409, "Bukti penyelesaian hanya dapat diunggah saat laporan diproses atau selesai.");
+      }
+    }
 
     const count = await query<RowDataPacket & { n: number }>(
-      "SELECT COUNT(*) AS n FROM report_photos WHERE report_id = ?",
-      [reportId]
+      "SELECT COUNT(*) AS n FROM report_photos WHERE report_id = ? AND kind = ?",
+      [reportId, kind]
     );
     if (Number(count[0].n) >= MAX_PHOTOS) throw new HttpError(409, `Maksimal ${MAX_PHOTOS} foto per laporan.`);
 
@@ -34,8 +46,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     if (!(buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff)) throw new HttpError(400, "Berkas bukan gambar JPEG yang valid.");
 
     const [res] = await pool().query<ResultSetHeader>(
-      "INSERT INTO report_photos (report_id, mime, size_bytes, data) VALUES (?, 'image/jpeg', ?, ?)",
-      [reportId, buf.length, buf]
+      "INSERT INTO report_photos (report_id, kind, mime, size_bytes, data) VALUES (?, ?, 'image/jpeg', ?, ?)",
+      [reportId, kind, buf.length, buf]
     );
     return ok({ id: res.insertId }, 201);
   });

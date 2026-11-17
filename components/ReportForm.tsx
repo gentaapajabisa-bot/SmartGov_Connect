@@ -2,7 +2,8 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { compressImage } from "@/lib/image";
-import type { Category } from "@/lib/types";
+import type { Category, NearbyReport } from "@/lib/types";
+import { STATUS_LABEL } from "@/lib/types";
 import MapPicker, { type LatLng } from "./MapPicker";
 import { api } from "./ui";
 
@@ -23,6 +24,8 @@ export default function ReportForm({ onCreated }: { onCreated: () => void }) {
   const [ticket, setTicket] = useState("");
   const [progress, setProgress] = useState("");
   const [busy, setBusy] = useState(false);
+  const [categoryId, setCategoryId] = useState("");
+  const [nearby, setNearby] = useState<NearbyReport[]>([]);
   const picksRef = useRef<Pick[]>([]);
   picksRef.current = picks;
 
@@ -33,6 +36,43 @@ export default function ReportForm({ onCreated }: { onCreated: () => void }) {
     // lepas URL pratinjau saat komponen ditutup
     return () => picksRef.current.forEach((p) => URL.revokeObjectURL(p.preview));
   }, []);
+
+  // Cek laporan serupa di sekitar titik yang ditandai (jeda singkat agar tidak memanggil API terus-menerus).
+  useEffect(() => {
+    if (!coords) {
+      setNearby([]);
+      return;
+    }
+    let cancelled = false;
+    const t = setTimeout(() => {
+      const p = new URLSearchParams({ lat: String(coords.lat), lng: String(coords.lng) });
+      if (categoryId) p.set("category_id", categoryId);
+      api<{ items: NearbyReport[] }>(`/api/reports/nearby?${p.toString()}`)
+        .then((d) => {
+          if (!cancelled) setNearby(d.items);
+        })
+        .catch(() => {
+          if (!cancelled) setNearby([]);
+        });
+    }, 600);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [coords, categoryId]);
+
+  async function toggleVote(r: NearbyReport) {
+    setError("");
+    try {
+      const d = await api<{ votes: number; voted: boolean }>(`/api/reports/${r.id}/vote`, {
+        method: r.voted ? "DELETE" : "POST",
+        body: r.voted ? undefined : {},
+      });
+      setNearby((xs) => xs.map((x) => (x.id === r.id ? { ...x, votes: d.votes, voted: d.voted } : x)));
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
 
   function useMyLocation() {
     setGeoMsg("");
@@ -124,6 +164,7 @@ export default function ReportForm({ onCreated }: { onCreated: () => void }) {
       picks.forEach((p) => URL.revokeObjectURL(p.preview));
       setPicks([]);
       setCoords(null);
+      setCategoryId("");
       setGeoMsg("");
       onCreated();
     } catch (err) {
@@ -148,7 +189,7 @@ export default function ReportForm({ onCreated }: { onCreated: () => void }) {
 
       <div className="field">
         <label htmlFor="category_id">Kategori</label>
-        <select id="category_id" name="category_id" required defaultValue="">
+        <select id="category_id" name="category_id" required defaultValue="" onChange={(e) => setCategoryId(e.target.value)}>
           <option value="" disabled>Pilih kategori</option>
           {categories.map((c) => (
             <option key={c.id} value={c.id}>{c.name}</option>
@@ -176,6 +217,27 @@ export default function ReportForm({ onCreated }: { onCreated: () => void }) {
         </div>
         {geoMsg && <span className="hint">{geoMsg}</span>}
         <MapPicker value={coords} onChange={setCoords} />
+        {nearby.length > 0 && (
+          <div className="nearby" role="region" aria-label="Laporan serupa di sekitar">
+            <strong>Sudah ada laporan serupa di sekitar lokasi ini</strong>
+            <span className="hint">Bila masalahnya sama, cukup dukung laporan yang ada agar prioritasnya naik. Tidak perlu membuat laporan baru.</span>
+            <ul>
+              {nearby.map((r) => (
+                <li key={r.id}>
+                  <div>
+                    <div className="nearby-title">{r.title}</div>
+                    <div className="hint">
+                      {r.category_name} &middot; {STATUS_LABEL[r.status]} &middot; sekitar {r.distance_m} m &middot; {r.votes} dukungan
+                    </div>
+                  </div>
+                  <button type="button" className={`btn btn-sm ${r.voted ? "btn-light" : ""}`} onClick={() => toggleVote(r)}>
+                    {r.voted ? "Batalkan dukungan" : "Dukung"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       <div className="field">

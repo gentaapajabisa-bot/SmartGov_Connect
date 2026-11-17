@@ -1,7 +1,7 @@
 // Migrasi untuk database yang SUDAH dibuat dengan versi lama.
 // Aman dijalankan berulang kali. Pemakaian: npm run db:migrate
 //  - membuat tabel baru (report_photos, notifications, auth_tokens, rate_limits, audit_log) bila belum ada
-//  - menambah kolom reports.assigned_to dan indeksnya bila belum ada
+//  - menambah kolom reports.assigned_to, users.email_verified_at/consent_at, categories.sla_hours, report_photos.kind bila belum ada
 import { readFile } from "node:fs/promises";
 import mysql from "mysql2/promise";
 
@@ -71,6 +71,34 @@ try {
     await conn.query("ALTER TABLE users ADD COLUMN consent_at TIMESTAMP NULL");
     await conn.query("UPDATE users SET consent_at = created_at");
     console.log("Kolom users.consent_at ditambahkan.");
+  }
+  // Tahap 2: SLA per kategori dan jenis foto.
+  if (!(await columnExists("categories", "sla_hours"))) {
+    await conn.query("ALTER TABLE categories ADD COLUMN sla_hours INT NOT NULL DEFAULT 168");
+    // Nilai awal yang masuk akal; admin dapat mengubahnya di tab Kategori.
+    const defaults = [
+      ["Keamanan & Ketertiban", 24],
+      ["Kebersihan & Sampah", 72],
+      ["Penerangan Jalan", 72],
+      ["Pelayanan Administrasi", 72],
+      ["Jalan & Infrastruktur", 168],
+      ["Lainnya", 168],
+    ];
+    for (const [name, h] of defaults) await conn.query("UPDATE categories SET sla_hours = ? WHERE name = ?", [h, name]);
+    console.log("Kolom categories.sla_hours ditambahkan.");
+  }
+  if (!(await columnExists("report_photos", "kind"))) {
+    await conn.query("ALTER TABLE report_photos ADD COLUMN kind VARCHAR(10) NOT NULL DEFAULT 'report'");
+    console.log("Kolom report_photos.kind ditambahkan.");
+  }
+  // Tahap 3: preferensi notifikasi.
+  if (!(await columnExists("users", "notify_email"))) {
+    await conn.query("ALTER TABLE users ADD COLUMN notify_email TINYINT(1) NOT NULL DEFAULT 1");
+    console.log("Kolom users.notify_email ditambahkan.");
+  }
+  if (!(await columnExists("users", "notify_wa"))) {
+    await conn.query("ALTER TABLE users ADD COLUMN notify_wa TINYINT(1) NOT NULL DEFAULT 0");
+    console.log("Kolom users.notify_wa ditambahkan.");
   }
   console.log("Migrasi selesai.");
 } finally {

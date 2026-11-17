@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { STATUSES, STATUS_LABEL, type Category, type ReportSummary, type Role } from "@/lib/types";
 import ReportDetail from "./ReportDetail";
-import { StatusBadge, api, formatDate } from "./ui";
+import { SlaBadge, StatusBadge, api, formatDate } from "./ui";
 
 export default function ReportBrowser({
   role,
@@ -19,6 +19,8 @@ export default function ReportBrowser({
   const [status, setStatus] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [assigned, setAssigned] = useState("");
+  const [sla, setSla] = useState("");
+  const [sort, setSort] = useState("");
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -40,6 +42,8 @@ export default function ReportBrowser({
       if (status) params.set("status", status);
       if (categoryId) params.set("category_id", categoryId);
       if (isStaff && assigned) params.set("assigned", assigned);
+      if (isStaff && sla === "late") params.set("overdue", "1");
+      if (isStaff && sort) params.set("sort", sort);
       if (q.trim()) params.set("q", q.trim());
       const d = await api<{ reports: ReportSummary[] }>(`/api/reports?${params.toString()}`);
       setItems(d.reports);
@@ -48,7 +52,7 @@ export default function ReportBrowser({
     } finally {
       setLoading(false);
     }
-  }, [status, categoryId, assigned, q, isStaff]);
+  }, [status, categoryId, assigned, sla, sort, q, isStaff]);
 
   useEffect(() => {
     const t = setTimeout(load, 250); // jeda singkat saat mengetik pencarian
@@ -84,6 +88,19 @@ export default function ReportBrowser({
             <option value="none">Belum ditugaskan</option>
           </select>
         )}
+        {isStaff && (
+          <select value={sla} onChange={(e) => setSla(e.target.value)} aria-label="Filter SLA">
+            <option value="">Semua SLA</option>
+            <option value="late">Terlambat</option>
+          </select>
+        )}
+        {isStaff && (
+          <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Urutan">
+            <option value="">Terbaru</option>
+            <option value="votes">Dukungan terbanyak</option>
+            <option value="due">Batas SLA terdekat</option>
+          </select>
+        )}
       </div>
 
       {error && <div className="alert alert-error" role="alert">{error}</div>}
@@ -105,7 +122,11 @@ export default function ReportBrowser({
             >
               <div className="meta">
                 <span>{r.ticket_no}</span>
-                <StatusBadge status={r.status} />
+                <span style={{ display: "inline-flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                  {r.votes > 0 && <span className="votes" title="Dukungan warga">▲ {r.votes}</span>}
+                  <SlaBadge status={r.status} due_at={r.due_at} overdue={r.overdue} />
+                  <StatusBadge status={r.status} />
+                </span>
               </div>
               <div className="title">{r.title}</div>
               <div className="sub">

@@ -25,7 +25,14 @@ Tiga jenis pengguna: **Warga**, **Petugas Kelurahan**, **Admin**.
 | Reset kata sandi dan verifikasi email (via Resend; opsional) | Sudah ada |
 | Kebijakan privasi (templat) dan persetujuan saat mendaftar | Sudah ada |
 | Log audit tindakan admin (pengguna dan kategori) | Sudah ada |
-| Notifikasi email/WhatsApp untuk status laporan | Belum ada |
+| Target waktu penanganan (SLA) per kategori, penanda "Terlambat", statistik keterlambatan | Sudah ada |
+| Peringatan laporan serupa (radius 250 m) dan dukungan warga; staf dapat mengurutkan menurut dukungan | Sudah ada |
+| Penilaian warga (bintang + komentar) setelah laporan selesai; rata-rata per petugas di statistik | Sudah ada |
+| Foto bukti penyelesaian dari petugas yang ditugaskan atau admin | Sudah ada |
+| Notifikasi email dan WhatsApp saat status berubah (opt-in per warga, di tab Notifikasi) | Sudah ada (WhatsApp belum diuji dengan penyedia nyata) |
+| Peta panas sebaran laporan (staf/admin) | Sudah ada |
+| Mode terang/gelap (pilihan tersimpan di peramban; bawaan gelap) | Sudah ada |
+| PWA: dapat dipasang di HP/komputer, halaman offline saat jaringan putus | Sudah ada |
 
 > Catatan pengujian: kode ini sudah lolos pemeriksaan sintaks, tetapi **belum pernah dijalankan** terhadap database TiDB sungguhan karena paket npm tidak dapat dipasang di lingkungan pembuatnya. Jalankan langkah di bawah dan laporkan galat bila ada.
 
@@ -130,3 +137,15 @@ middleware.ts      gerbang awal untuk /dashboard
 2. Di Vercel (Settings, Environment Variables) tambahkan `RESEND_API_KEY`, `APP_URL` (mis. `https://smartgovconnect.vercel.app`), dan opsional `MAIL_FROM`.
 3. Tanpa domain terverifikasi, Resend hanya mengirim ke email pemilik akun Resend. Untuk warga umum, verifikasi domain Anda di Resend.
 4. Tanpa `RESEND_API_KEY`, aplikasi tetap berjalan tetapi email tidak terkirim.
+
+## Migrasi Tahap 2
+
+Jalankan `npm run db:migrate` (aman diulang). Perintah ini menambah `categories.sla_hours` (nilai awal 24 jam untuk Keamanan, 72 jam untuk Kebersihan/Penerangan/Administrasi, 168 jam lainnya), `report_photos.kind`, serta tabel `report_votes` dan `report_ratings`. Target SLA dapat diubah admin di tab Kategori.
+
+## Migrasi dan konfigurasi Tahap 3
+
+- Jalankan `npm run db:migrate` (menambah `users.notify_email` dan `users.notify_wa`).
+- Email: lihat bagian Email (Resend). Pembaruan hanya dikirim ke warga yang sudah memverifikasi email dan mengaktifkan opsinya.
+- WhatsApp (opsional): isi `WHATSAPP_TOKEN` (contoh penyedia: Fonnte) di Vercel. Opsi ini hanya muncul bagi warga yang menyimpan nomor HP. Kode pengiriman belum diuji dengan akun penyedia nyata, sesuaikan `WHATSAPP_API_URL` atau `lib/whatsapp.ts` bila penyedia Anda berbeda.
+- PWA: aktif otomatis di produksi (Vercel). Service worker hanya menampilkan halaman offline dan tidak menyimpan halaman atau data API.
+- Tema terang: animasi kota 3D dimatikan pada tema terang.

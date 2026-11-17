@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS users (
   is_active     TINYINT(1)   NOT NULL DEFAULT 1,
   email_verified_at TIMESTAMP NULL,
   consent_at    TIMESTAMP    NULL,
+  notify_email  TINYINT(1)   NOT NULL DEFAULT 1,  -- kirim pembaruan status ke email (hanya bila email terverifikasi)
+  notify_wa     TINYINT(1)   NOT NULL DEFAULT 0,  -- kirim pembaruan lewat WhatsApp (opt-in, perlu nomor HP)
   created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -27,6 +29,7 @@ CREATE TABLE IF NOT EXISTS categories (
   id          BIGINT       NOT NULL AUTO_INCREMENT,
   name        VARCHAR(80)  NOT NULL,
   description VARCHAR(255) NULL,
+  sla_hours   INT          NOT NULL DEFAULT 168,  -- target waktu penyelesaian (jam) sejak laporan masuk
   is_active   TINYINT(1)   NOT NULL DEFAULT 1,
   created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -75,6 +78,7 @@ CREATE TABLE IF NOT EXISTS report_status_history (
 CREATE TABLE IF NOT EXISTS report_photos (
   id         BIGINT      NOT NULL AUTO_INCREMENT,
   report_id  BIGINT      NOT NULL,
+  kind       VARCHAR(10) NOT NULL DEFAULT 'report',  -- 'report' = foto pelapor, 'proof' = bukti penyelesaian dari petugas
   mime       VARCHAR(30) NOT NULL DEFAULT 'image/jpeg',
   size_bytes INT         NOT NULL,
   data       MEDIUMBLOB  NOT NULL,
@@ -128,6 +132,26 @@ CREATE TABLE IF NOT EXISTS audit_log (
   created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY idx_audit_created (created_at)
+);
+
+-- Dukungan warga pada laporan orang lain (satu dukungan per warga per laporan).
+CREATE TABLE IF NOT EXISTS report_votes (
+  report_id  BIGINT    NOT NULL,
+  user_id    BIGINT    NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (report_id, user_id),
+  KEY idx_votes_user (user_id)
+);
+
+-- Penilaian warga setelah laporan selesai (satu per laporan).
+CREATE TABLE IF NOT EXISTS report_ratings (
+  report_id  BIGINT       NOT NULL,
+  user_id    BIGINT       NOT NULL,
+  stars      TINYINT      NOT NULL,
+  comment    VARCHAR(500) NULL,
+  created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (report_id)
 );
 
 -- Kategori awal (aman dijalankan berulang)

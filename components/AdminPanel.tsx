@@ -12,7 +12,7 @@ import {
 } from "@/lib/types";
 import ReportBrowser from "./ReportBrowser";
 import ReportMap from "./ReportMap";
-import { api, formatDate } from "./ui";
+import { Stars, api, formatDate } from "./ui";
 
 type Tab = "reports" | "map" | "stats" | "users" | "categories" | "audit";
 
@@ -116,6 +116,12 @@ function StatsView() {
         <div className="stat"><div className="n">{count("selesai")}</div><div className="l">Selesai</div></div>
         <div className="stat"><div className="n">{count("ditolak")}</div><div className="l">Ditolak</div></div>
         <div className="stat"><div className="n">{stats.unassigned}</div><div className="l">Belum ditugaskan</div></div>
+        <div className="stat"><div className="n" style={stats.overdue > 0 ? { color: "var(--danger)" } : undefined}>{stats.overdue}</div><div className="l">Terlambat (lewat SLA)</div></div>
+        <div className="stat"><div className="n">{stats.slaMetPct === null ? "-" : `${stats.slaMetPct}%`}</div><div className="l">Selesai tepat waktu</div></div>
+        <div className="stat">
+          <div className="n">{stats.avgRating === null ? "-" : stats.avgRating.toFixed(1)}</div>
+          <div className="l">Kepuasan warga{stats.ratingCount > 0 ? ` (${stats.ratingCount} penilaian)` : ""}</div>
+        </div>
         <div className="stat"><div className="n">{avg}</div><div className="l">Rata-rata penyelesaian</div></div>
         <div className="stat"><div className="n">{stats.totals.users}</div><div className="l">Pengguna</div></div>
       </div>
@@ -174,7 +180,7 @@ function StatsView() {
               <div className="bar-row" key={w.name}>
                 <span>{w.name}</span>
                 <div className="bar"><span style={{ width: `${((w.open + w.done) / maxLoad) * 100}%` }} /></div>
-                <strong>{w.open} aktif / {w.done} selesai</strong>
+                <strong>{w.open} aktif / {w.done} selesai{w.rating !== null && <> &middot; <Stars value={w.rating} size="0.85rem" /> {w.rating.toFixed(1)}</>}</strong>
               </div>
             ))}
           </div>
@@ -404,6 +410,11 @@ function CategoriesView() {
         <div className="row">
           <div className="field"><label htmlFor="c-name">Nama</label><input id="c-name" name="name" type="text" required /></div>
           <div className="field"><label htmlFor="c-desc">Deskripsi (opsional)</label><input id="c-desc" name="description" type="text" /></div>
+          <div className="field">
+            <label htmlFor="c-sla">Target selesai (jam)</label>
+            <input id="c-sla" name="sla_hours" type="number" min={1} max={8760} defaultValue={168} />
+            <span className="hint">168 jam = 7 hari.</span>
+          </div>
         </div>
         <button className="btn" disabled={busy}>{busy ? "Menyimpan..." : "Tambah"}</button>
       </form>
@@ -412,12 +423,13 @@ function CategoriesView() {
 
       <div className="card table-wrap">
         <table>
-          <thead><tr><th>Nama</th><th>Deskripsi</th><th>Status</th></tr></thead>
+          <thead><tr><th>Nama</th><th>Deskripsi</th><th>Target (jam)</th><th>Status</th></tr></thead>
           <tbody>
             {cats.map((c) => (
               <tr key={c.id} className={c.is_active ? "" : "inactive"}>
                 <td>{c.name}</td>
                 <td>{c.description ?? "-"}</td>
+                <td><SlaCell category={c} onSaved={load} onError={setError} /></td>
                 <td>
                   <button className={`btn btn-sm ${c.is_active ? "btn-light" : ""}`} onClick={() => toggle(c)}>
                     {c.is_active ? "Nonaktifkan" : "Aktifkan"}
@@ -432,5 +444,39 @@ function CategoriesView() {
         </p>
       </div>
     </>
+  );
+}
+
+function SlaCell({ category, onSaved, onError }: { category: Category; onSaved: () => void; onError: (m: string) => void }) {
+  const [value, setValue] = useState(String(category.sla_hours));
+  const [busy, setBusy] = useState(false);
+  const changed = value !== String(category.sla_hours);
+
+  async function save() {
+    onError("");
+    setBusy(true);
+    try {
+      await api(`/api/admin/categories/${category.id}`, { method: "PATCH", body: { sla_hours: Number(value) } });
+      onSaved();
+    } catch (e) {
+      onError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+      <input
+        type="number"
+        min={1}
+        max={8760}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        aria-label={`Target jam untuk ${category.name}`}
+        style={{ width: 90 }}
+      />
+      {changed && <button className="btn btn-sm" onClick={save} disabled={busy}>Simpan</button>}
+    </span>
   );
 }

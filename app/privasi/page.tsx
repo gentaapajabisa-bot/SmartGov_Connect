@@ -34,6 +34,8 @@ export default async function PrivacyPage() {
             <li>Petugas dan admin kelurahan melihat laporan untuk menindaklanjuti. Pada laporan anonim, nama pelapor disembunyikan dari petugas.</li>
             <li>Email dan nomor HP tidak ditampilkan pada daftar maupun detail laporan.</li>
             <li>Tindakan admin dicatat dalam log audit.</li>
+            <li>Bila Anda mengaktifkannya, pembaruan status dikirim ke email atau WhatsApp Anda lewat penyedia layanan pengiriman pihak ketiga. Pesan hanya memuat nomor tiket dan status. Anda dapat menonaktifkannya kapan saja di tab Notifikasi.</li>
+            <li>Saat Anda menandai lokasi di peta, warga lain yang menandai titik berdekatan dapat melihat judul, kategori, status, dan jarak perkiraan laporan Anda yang masih berjalan agar tidak membuat laporan ganda. Nama pelapor, alamat, dan uraian tidak ditampilkan.</li>
           </ul>
 
           <h2>Hak Anda</h2>

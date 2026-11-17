@@ -20,10 +20,13 @@ export default function MapView({
   points,
   selectedId,
   onSelect,
+  mode = "points",
 }: {
   points: MapPoint[];
   selectedId: number | null;
   onSelect: (id: number) => void;
+  /** points = satu penanda per laporan; heat = peta panas (area pekat = banyak laporan berdekatan). */
+  mode?: "points" | "heat";
 }) {
   const box = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
@@ -65,7 +68,19 @@ export default function MapView({
     const layer = layerRef.current;
     if (!ready || !L || !map || !layer) return;
     layer.clearLayers();
-    for (const p of points) {
+    if (mode === "heat") {
+      // Lingkaran transparan yang saling menumpuk: semakin banyak laporan berdekatan, semakin pekat.
+      for (const p of points) {
+        L.circle([p.latitude, p.longitude], {
+          radius: 180,
+          stroke: false,
+          fillColor: "#f97316",
+          fillOpacity: 0.16,
+          interactive: false,
+        }).addTo(layer);
+      }
+    }
+    for (const p of mode === "heat" ? [] : points) {
       const sel = p.id === selectedId;
       const m = L.circleMarker([p.latitude, p.longitude], {
         radius: sel ? 11 : 7,
@@ -87,7 +102,7 @@ export default function MapView({
       map.fitBounds(L.latLngBounds(points.map((p) => [p.latitude, p.longitude] as [number, number])), { padding: [40, 40], maxZoom: 16 });
       fitted.current = true;
     }
-  }, [points, selectedId, ready]);
+  }, [points, selectedId, ready, mode]);
 
   return <div ref={box} className="map-box map-box-lg" role="application" aria-label="Peta sebaran laporan" />;
 }

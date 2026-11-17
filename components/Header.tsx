@@ -3,6 +3,7 @@ import { ROLE_LABEL, type SessionUser } from "@/lib/types";
 import Logo from "./Logo";
 import LogoutButton from "./LogoutButton";
 import NotificationBell from "./NotificationBell";
+import ThemeToggle from "./ThemeToggle";
 
 export default function Header({ user }: { user?: SessionUser | null }) {
   return (
@@ -14,6 +15,7 @@ export default function Header({ user }: { user?: SessionUser | null }) {
         </Link>
         {user ? (
           <div className="header-user">
+            <ThemeToggle />
             <NotificationBell />
             <span>{user.name}</span>
             <span className="role-chip">{ROLE_LABEL[user.role]}</span>
@@ -21,6 +23,7 @@ export default function Header({ user }: { user?: SessionUser | null }) {
           </div>
         ) : (
           <nav className="header-user">
+            <ThemeToggle />
             <Link href="/login" className="btn btn-ghost btn-sm">Masuk</Link>
             <Link href="/register" className="btn btn-light btn-sm">Daftar</Link>
           </nav>

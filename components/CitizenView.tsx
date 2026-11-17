@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import ReportBrowser from "./ReportBrowser";
+import NotifyPrefs from "./NotifyPrefs";
 import ReportForm from "./ReportForm";
 
 export default function CitizenView() {
-  const [tab, setTab] = useState<"mine" | "new">("mine");
+  const [tab, setTab] = useState<"mine" | "new" | "prefs">("mine");
   const [refreshKey, setRefreshKey] = useState(0);
 
   return (
@@ -17,9 +18,14 @@ export default function CitizenView() {
         <button className="tab" role="tab" aria-selected={tab === "new"} onClick={() => setTab("new")}>
           Buat pengaduan
         </button>
+        <button className="tab" role="tab" aria-selected={tab === "prefs"} onClick={() => setTab("prefs")}>
+          Notifikasi
+        </button>
       </div>
 
-      {tab === "new" ? (
+      {tab === "prefs" ? (
+        <NotifyPrefs />
+      ) : tab === "new" ? (
         <div style={{ maxWidth: 640 }}>
           <ReportForm onCreated={() => setRefreshKey((n) => n + 1)} />
           <p style={{ marginTop: 12 }}>

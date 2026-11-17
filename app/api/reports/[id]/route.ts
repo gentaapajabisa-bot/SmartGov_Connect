@@ -3,8 +3,9 @@ import { requireUser } from "@/lib/auth";
 import { query, withTransaction } from "@/lib/db";
 import { HttpError, ok, parseId, readJson, run } from "@/lib/http";
 import { notify, statusMessage } from "@/lib/notify";
+import { notifyExternal } from "@/lib/outbound";
 import { REPORT_JOINS, REPORT_SELECT, toSummary, type ReportRow } from "@/lib/reports";
-import { STATUS_LABEL, type HistoryItem, type ReportDetailData, type Status } from "@/lib/types";
+import { STATUS_LABEL, type HistoryItem, type RatingData, type ReportDetailData, type Status } from "@/lib/types";
 import { reportUpdateSchema } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
@@ -45,7 +46,7 @@ export async function GET(_req: Request, { params }: Ctx) {
       throw new HttpError(404, "Laporan tidak ditemukan.");
     }
 
-    const [historyRows, photoRows] = await Promise.all([
+    const [historyRows, photoRows, ratingRows] = await Promise.all([
       query<HistoryRow>(
         `SELECT h.id, h.status, h.note, h.changed_by, u.name AS actor_name, h.created_at
            FROM report_status_history h
@@ -54,8 +55,10 @@ export async function GET(_req: Request, { params }: Ctx) {
           ORDER BY h.created_at, h.id`,
         [id]
       ),
-      query<RowDataPacket & { id: number }>("SELECT id FROM report_photos WHERE report_id = ? ORDER BY id", [id]),
+      query<RowDataPacket & { id: number; kind: "report" | "proof" }>("SELECT id, kind FROM report_photos WHERE report_id = ? ORDER BY id", [id]),
+      query<RowDataPacket & { stars: number; comment: string | null }>("SELECT stars, comment FROM report_ratings WHERE report_id = ? LIMIT 1", [id]),
     ]);
+    const rating: RatingData | null = ratingRows[0] ? { stars: Number(ratingRows[0].stars), comment: ratingRows[0].comment } : null;
 
     const history: HistoryItem[] = historyRows.map((h) => ({
       id: h.id,
@@ -79,7 +82,8 @@ export async function GET(_req: Request, { params }: Ctx) {
       officer_note: row.officer_note,
       updated_at: new Date(row.updated_at).toISOString(),
       history,
-      photos: photoRows.map((p) => ({ id: p.id })),
+      photos: photoRows.map((p) => ({ id: p.id, kind: p.kind })),
+      rating,
     };
     return ok({ report: detail });
   });
@@ -92,6 +96,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
     const id = parseId(params.id);
     const data = reportUpdateSchema.parse(await readJson(req));
     const note = data.note?.trim() || null;
+    let external: { userId: number; text: string } | null = null;
 
     await withTransaction(async (conn) => {
       const [found] = await conn.query<(RowDataPacket & { status: Status; ticket_no: string; user_id: number; assigned_to: number | null })[]>(
@@ -157,11 +162,16 @@ export async function PATCH(req: Request, { params }: Ctx) {
         // Beri tahu pelapor (tanpa membuka identitas petugas).
         if (statusChanged) {
           await notify(conn, current.user_id, id, statusMessage(current.ticket_no, status));
+          external = { userId: current.user_id, text: statusMessage(current.ticket_no, status) };
         } else {
           await notify(conn, current.user_id, id, `Ada catatan baru pada laporan ${current.ticket_no} (status: ${STATUS_LABEL[status]}).`);
         }
       }
     });
+
+    // Email/WhatsApp dikirim setelah transaksi berhasil; kegagalannya tidak memengaruhi hasil.
+    const ext = external as { userId: number; text: string } | null;
+    if (ext) await notifyExternal(req, ext.userId, "Pembaruan laporan Anda", ext.text);
 
     return ok({ success: true });
   });

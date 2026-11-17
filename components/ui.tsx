@@ -32,3 +32,28 @@ export function formatDate(iso: string): string {
 export function StatusBadge({ status }: { status: Status }) {
   return <span className={`badge badge-${status}`}>{STATUS_LABEL[status]}</span>;
 }
+
+function humanDuration(ms: number): string {
+  const h = Math.round(ms / 3_600_000);
+  if (h < 1) return "kurang dari 1 jam";
+  if (h < 48) return `${h} jam`;
+  return `${Math.round(h / 24)} hari`;
+}
+
+/** Penanda target waktu (SLA): merah bila terlambat, redup bila masih dalam batas, kosong bila laporan sudah ditutup. */
+export function SlaBadge({ status, due_at, overdue }: { status: Status; due_at: string; overdue: boolean }) {
+  if (status === "selesai" || status === "ditolak") return null;
+  const diff = new Date(due_at).getTime() - Date.now();
+  if (overdue) return <span className="sla sla-late">Terlambat {humanDuration(-diff)}</span>;
+  return <span className="sla">Sisa {humanDuration(diff)}</span>;
+}
+
+export function Stars({ value, size = "1rem" }: { value: number; size?: string }) {
+  return (
+    <span className="stars" style={{ fontSize: size }} role="img" aria-label={`${value} dari 5 bintang`}>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <span key={n} className={n <= Math.round(value) ? "on" : ""} aria-hidden="true">★</span>
+      ))}
+    </span>
+  );
+}

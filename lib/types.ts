@@ -32,6 +32,8 @@ export interface Category {
   id: number;
   name: string;
   description: string | null;
+  /** Target waktu penyelesaian dalam jam. */
+  sla_hours: number;
   is_active: boolean;
 }
 
@@ -49,10 +51,33 @@ export interface ReportSummary {
   assigned_to: number | null;
   assigned_name: string | null;
   created_at: string;
+  /** Batas waktu penyelesaian menurut SLA kategori. */
+  due_at: string;
+  /** true bila masih berjalan dan sudah melewati due_at. */
+  overdue: boolean;
+  /** Jumlah dukungan warga. */
+  votes: number;
 }
 
 export interface PhotoRef {
   id: number;
+  /** report = foto pelapor; proof = bukti penyelesaian dari petugas. */
+  kind: "report" | "proof";
+}
+
+export interface RatingData {
+  stars: number;
+  comment: string | null;
+}
+
+export interface NearbyReport {
+  id: number;
+  title: string;
+  category_name: string;
+  status: Status;
+  distance_m: number;
+  votes: number;
+  voted: boolean;
 }
 
 export interface StaffUser {
@@ -95,6 +120,7 @@ export interface ReportDetailData extends ReportSummary {
   updated_at: string;
   history: HistoryItem[];
   photos: PhotoRef[];
+  rating: RatingData | null;
 }
 
 export interface AdminUser {
@@ -113,7 +139,13 @@ export interface Stats {
   /** Rata-rata jam dari laporan masuk sampai pertama kali berstatus selesai; null bila belum ada. */
   avgResolveHours: number | null;
   unassigned: number;
-  workload: { name: string; open: number; done: number }[];
+  workload: { name: string; open: number; done: number; rating: number | null }[];
+  /** Laporan yang masih berjalan dan sudah melewati SLA (kondisi saat ini). */
+  overdue: number;
+  /** Persentase laporan selesai yang tepat waktu menurut SLA; null bila belum ada. */
+  slaMetPct: number | null;
+  avgRating: number | null;
+  ratingCount: number;
   totals: { reports: number; users: number };
   byStatus: { status: Status; n: number }[];
   byCategory: { name: string; n: number }[];

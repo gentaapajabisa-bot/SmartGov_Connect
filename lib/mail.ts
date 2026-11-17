@@ -23,6 +23,7 @@ export async function sendMail(to: string, subject: string, text: string, linkLa
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
+      signal: AbortSignal.timeout(5000),
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         from: process.env.MAIL_FROM || "SmartGov Connect <onboarding@resend.dev>",

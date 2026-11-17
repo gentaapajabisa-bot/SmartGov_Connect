@@ -9,13 +9,14 @@ interface CategoryRow extends RowDataPacket {
   id: number;
   name: string;
   description: string | null;
+  sla_hours: number;
 }
 
 export async function GET() {
   return run(async () => {
     await requireUser();
     const rows = await query<CategoryRow>(
-      "SELECT id, name, description FROM categories WHERE is_active = 1 ORDER BY name"
+      "SELECT id, name, description, sla_hours FROM categories WHERE is_active = 1 ORDER BY name"
     );
     return ok({ categories: rows.map((r) => ({ ...r, is_active: true })) });
   });

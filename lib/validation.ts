@@ -99,15 +99,31 @@ export const adminUserPatchSchema = z
   })
   .refine((d) => d.role !== undefined || d.is_active !== undefined, { message: "Tidak ada perubahan." });
 
+const slaHours = z.coerce.number({ invalid_type_error: "Target waktu harus berupa angka." }).int("Target waktu harus bilangan bulat.").min(1, "Target waktu minimal 1 jam.").max(8760, "Target waktu maksimal 8760 jam (1 tahun).");
+
 export const categoryCreateSchema = z.object({
   name: z.string().trim().min(3, "Nama kategori minimal 3 karakter.").max(80),
   description: z.string().trim().max(255).optional(),
+  sla_hours: slaHours.optional(),
 });
 
 export const categoryPatchSchema = z
   .object({
     name: z.string().trim().min(3).max(80).optional(),
     description: z.string().trim().max(255).optional(),
+    sla_hours: slaHours.optional(),
     is_active: z.boolean().optional(),
   })
   .refine((d) => Object.keys(d).length > 0, { message: "Tidak ada perubahan." });
+
+export const ratingSchema = z.object({
+  stars: z.number({ invalid_type_error: "Pilih jumlah bintang." }).int().min(1, "Pilih jumlah bintang.").max(5, "Pilih jumlah bintang."),
+  comment: z.string().trim().max(500, "Komentar maksimal 500 karakter.").optional(),
+});
+
+export const preferencesSchema = z
+  .object({
+    notify_email: z.boolean().optional(),
+    notify_wa: z.boolean().optional(),
+  })
+  .refine((d) => d.notify_email !== undefined || d.notify_wa !== undefined, { message: "Tidak ada perubahan." });

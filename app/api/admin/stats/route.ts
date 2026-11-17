@@ -22,7 +22,7 @@ export async function GET(req: Request) {
     const scope = `r.created_at >= (UTC_TIMESTAMP() - INTERVAL ${days} DAY)${categoryId ? " AND r.category_id = ?" : ""}`;
     const sp = categoryId ? [categoryId] : [];
 
-    const [byStatus, byCategory, byRole, daily, resolve, unassigned, workload] = await Promise.all([
+    const [byStatus, byCategory, byRole, daily, resolve, unassigned, workload, overdue, sla, rating] = await Promise.all([
       query<RowDataPacket & { status: Status; n: number }>(
         `SELECT r.status, COUNT(*) AS n FROM reports r WHERE ${scope} GROUP BY r.status`,
         sp
@@ -51,16 +51,43 @@ export async function GET(req: Request) {
         `SELECT COUNT(*) AS n FROM reports r WHERE r.assigned_to IS NULL AND r.status IN ('baru','diverifikasi','diproses')${categoryId ? " AND r.category_id = ?" : ""}`,
         sp
       ),
-      query<RowDataPacket & { name: string; open_n: number; done_n: number }>(
+      query<RowDataPacket & { name: string; open_n: number; done_n: number; avg_rating: string | null }>(
         `SELECT u.name,
                 SUM(CASE WHEN r.status IN ('baru','diverifikasi','diproses') THEN 1 ELSE 0 END) AS open_n,
-                SUM(CASE WHEN r.status = 'selesai' THEN 1 ELSE 0 END) AS done_n
+                SUM(CASE WHEN r.status = 'selesai' THEN 1 ELSE 0 END) AS done_n,
+                AVG(rt.stars) AS avg_rating
            FROM reports r JOIN users u ON u.id = r.assigned_to
+           LEFT JOIN report_ratings rt ON rt.report_id = r.id
           WHERE ${scope}
           GROUP BY u.id, u.name ORDER BY open_n DESC, u.name`,
         sp
       ),
+      // Keterlambatan adalah kondisi saat ini, tidak dibatasi periode.
+      query<RowDataPacket & { n: number }>(
+        `SELECT COUNT(*) AS n FROM reports r JOIN categories c ON c.id = r.category_id
+          WHERE r.status IN ('baru','diverifikasi','diproses')
+            AND DATE_ADD(r.created_at, INTERVAL c.sla_hours HOUR) < UTC_TIMESTAMP()${categoryId ? " AND r.category_id = ?" : ""}`,
+        sp
+      ),
+      query<RowDataPacket & { total: number; met: string | null }>(
+        `SELECT COUNT(*) AS total,
+                SUM(CASE WHEN d.done_at <= DATE_ADD(r.created_at, INTERVAL c.sla_hours HOUR) THEN 1 ELSE 0 END) AS met
+           FROM reports r
+           JOIN categories c ON c.id = r.category_id
+           JOIN (SELECT report_id, MIN(created_at) AS done_at FROM report_status_history WHERE status = 'selesai' GROUP BY report_id) d
+             ON d.report_id = r.id
+          WHERE ${scope}`,
+        sp
+      ),
+      query<RowDataPacket & { avg_stars: string | null; n: number }>(
+        `SELECT AVG(rt.stars) AS avg_stars, COUNT(*) AS n
+           FROM report_ratings rt JOIN reports r ON r.id = rt.report_id
+          WHERE ${scope}`,
+        sp
+      ),
     ]);
+    const slaTotal = Number(sla[0]?.total ?? 0);
+    const avgStars = rating[0]?.avg_stars;
 
     const avgMin = resolve[0]?.avg_min;
     const stats: Stats = {
@@ -68,7 +95,16 @@ export async function GET(req: Request) {
       categoryId,
       avgResolveHours: avgMin === null || avgMin === undefined ? null : Math.round((Number(avgMin) / 60) * 10) / 10,
       unassigned: Number(unassigned[0]?.n ?? 0),
-      workload: workload.map((w) => ({ name: w.name, open: Number(w.open_n), done: Number(w.done_n) })),
+      workload: workload.map((w) => ({
+        name: w.name,
+        open: Number(w.open_n),
+        done: Number(w.done_n),
+        rating: w.avg_rating === null ? null : Math.round(Number(w.avg_rating) * 10) / 10,
+      })),
+      overdue: Number(overdue[0]?.n ?? 0),
+      slaMetPct: slaTotal === 0 ? null : Math.round((Number(sla[0]?.met ?? 0) / slaTotal) * 100),
+      avgRating: avgStars === null || avgStars === undefined ? null : Math.round(Number(avgStars) * 10) / 10,
+      ratingCount: Number(rating[0]?.n ?? 0),
       totals: {
         reports: byStatus.reduce((sum, r) => sum + Number(r.n), 0),
         users: byRole.reduce((sum, r) => sum + Number(r.n), 0),

@@ -28,6 +28,8 @@ export async function GET(req: Request) {
     const q = (url.searchParams.get("q") ?? "").trim().slice(0, 100);
     const categoryId = Number(url.searchParams.get("category_id") ?? "");
     const assigned = url.searchParams.get("assigned") ?? "";
+    const onlyOverdue = url.searchParams.get("overdue") === "1";
+    const sort = url.searchParams.get("sort") ?? "";
 
     const where: string[] = [];
     const params: unknown[] = [];
@@ -53,6 +55,9 @@ export async function GET(req: Request) {
         where.push("r.assigned_to IS NULL");
       }
     }
+    if (onlyOverdue) {
+      where.push("r.status IN ('baru','diverifikasi','diproses') AND DATE_ADD(r.created_at, INTERVAL c.sla_hours HOUR) < UTC_TIMESTAMP()");
+    }
     if (q) {
       const like = `%${q.replace(/[\\%_]/g, "\\$&")}%`;
       where.push("(r.ticket_no LIKE ? OR r.title LIKE ?)");
@@ -63,7 +68,7 @@ export async function GET(req: Request) {
       `SELECT ${REPORT_SELECT}
          ${REPORT_JOINS}
         ${where.length ? "WHERE " + where.join(" AND ") : ""}
-        ORDER BY r.created_at DESC
+        ORDER BY ${sort === "votes" ? "votes DESC, r.created_at DESC" : sort === "due" ? "due_at ASC" : "r.created_at DESC"}
         LIMIT 100`,
       params
     );

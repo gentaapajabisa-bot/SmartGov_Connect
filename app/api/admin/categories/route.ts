@@ -11,6 +11,7 @@ interface Row extends RowDataPacket {
   id: number;
   name: string;
   description: string | null;
+  sla_hours: number;
   is_active: number;
 }
 
@@ -18,7 +19,7 @@ interface Row extends RowDataPacket {
 export async function GET() {
   return run(async () => {
     await requireUser(["admin"]);
-    const rows = await query<Row>("SELECT id, name, description, is_active FROM categories ORDER BY name");
+    const rows = await query<Row>("SELECT id, name, description, sla_hours, is_active FROM categories ORDER BY name");
     return ok({ categories: rows.map((r) => ({ ...r, is_active: Boolean(r.is_active) })) });
   });
 }
@@ -29,8 +30,8 @@ export async function POST(req: Request) {
     const data = categoryCreateSchema.parse(await readJson(req));
     try {
       const [res] = await pool().query<ResultSetHeader>(
-        "INSERT INTO categories (name, description) VALUES (?, ?)",
-        [data.name, data.description || null]
+        "INSERT INTO categories (name, description, sla_hours) VALUES (?, ?, ?)",
+        [data.name, data.description || null, data.sla_hours ?? 168]
       );
       await audit(admin.id, "category.create", { type: "category", id: res.insertId }, data.name);
       return ok({ id: res.insertId }, 201);

@@ -10,6 +10,7 @@ import { api } from "./ui";
 export default function ReportMap({ role, userId = 0 }: { role: Role; userId?: number }) {
   const [points, setPoints] = useState<MapPoint[]>([]);
   const [onlyOpen, setOnlyOpen] = useState(true);
+  const [mode, setMode] = useState<"points" | "heat">("points");
   const [selected, setSelected] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -37,22 +38,32 @@ export default function ReportMap({ role, userId = 0 }: { role: Role; userId?: n
           <input type="checkbox" checked={onlyOpen} onChange={(e) => setOnlyOpen(e.target.checked)} />
           <span>Hanya laporan yang masih berjalan</span>
         </label>
+        <select value={mode} onChange={(e) => setMode(e.target.value as "points" | "heat")} aria-label="Tampilan peta">
+          <option value="points">Tampilan titik</option>
+          <option value="heat">Peta panas</option>
+        </select>
         <span className="hint" style={{ marginLeft: "auto" }}>
           {loading ? "Memuat..." : `${points.length} laporan berkoordinat`}
         </span>
       </div>
 
-      <div className="legend" aria-label="Keterangan warna status">
-        {STATUSES.map((s) => (
-          <span key={s}>
-            <i style={{ background: STATUS_COLOR[s] }} />
-            {STATUS_LABEL[s]}
-          </span>
-        ))}
-      </div>
+      {mode === "heat" ? (
+        <div className="legend">
+          <span><i style={{ background: "#f97316", opacity: 0.45 }} /> Semakin pekat = semakin banyak laporan berdekatan (radius sekitar 180 m)</span>
+        </div>
+      ) : (
+        <div className="legend" aria-label="Keterangan warna status">
+          {STATUSES.map((s) => (
+            <span key={s}>
+              <i style={{ background: STATUS_COLOR[s] }} />
+              {STATUS_LABEL[s]}
+            </span>
+          ))}
+        </div>
+      )}
 
       {error && <div className="alert alert-error" role="alert">{error}</div>}
-      <MapView points={points} selectedId={selected} onSelect={setSelected} />
+      <MapView points={points} selectedId={selected} onSelect={setSelected} mode={mode} />
       {!loading && points.length === 0 && !error && (
         <div className="empty" style={{ marginTop: 12 }}>
           Belum ada laporan dengan koordinat. Warga menandai lokasi lewat peta saat membuat pengaduan.
@@ -63,7 +74,7 @@ export default function ReportMap({ role, userId = 0 }: { role: Role; userId?: n
         {selected ? (
           <ReportDetail id={selected} role={role} userId={userId} onChanged={load} />
         ) : (
-          points.length > 0 && <div className="empty">Klik sebuah penanda di peta untuk melihat detail laporan.</div>
+          points.length > 0 && mode === "points" && <div className="empty">Klik sebuah penanda di peta untuk melihat detail laporan.</div>
         )}
       </div>
     </div>

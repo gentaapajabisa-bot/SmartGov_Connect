@@ -11,6 +11,8 @@ export interface ReportRow extends RowDataPacket {
   is_anonymous: number;
   assigned_to: number | null;
   created_at: Date;
+  due_at: Date;
+  votes: number;
   category_name: string;
   reporter_name: string;
   assigned_name: string | null;
@@ -18,7 +20,9 @@ export interface ReportRow extends RowDataPacket {
 
 /** Kolom dan JOIN standar untuk daftar/detail laporan. Alias: r=reports, c=categories, u=pelapor, a=petugas. */
 export const REPORT_SELECT = `r.id, r.ticket_no, r.user_id, r.title, r.status, r.location_text, r.is_anonymous,
-  r.assigned_to, r.created_at, c.name AS category_name, u.name AS reporter_name, a.name AS assigned_name`;
+  r.assigned_to, r.created_at, c.name AS category_name, u.name AS reporter_name, a.name AS assigned_name,
+  DATE_ADD(r.created_at, INTERVAL c.sla_hours HOUR) AS due_at,
+  (SELECT COUNT(*) FROM report_votes v WHERE v.report_id = r.id) AS votes`;
 export const REPORT_JOINS = `FROM reports r
   JOIN categories c ON c.id = r.category_id
   JOIN users u ON u.id = r.user_id
@@ -37,8 +41,11 @@ export function visibleReporterName(viewerRole: Role, row: { is_anonymous: numbe
   return row.reporter_name;
 }
 
+const OPEN: readonly Status[] = ["baru", "diverifikasi", "diproses"];
+
 export function toSummary(viewer: SessionUser, row: ReportRow): ReportSummary {
   const staff = viewer.role !== "warga";
+  const due = new Date(row.due_at);
   return {
     id: row.id,
     ticket_no: row.ticket_no,
@@ -52,5 +59,8 @@ export function toSummary(viewer: SessionUser, row: ReportRow): ReportSummary {
     assigned_to: staff ? row.assigned_to : null,
     assigned_name: staff ? row.assigned_name : null,
     created_at: new Date(row.created_at).toISOString(),
+    due_at: due.toISOString(),
+    overdue: OPEN.includes(row.status) && due.getTime() < Date.now(),
+    votes: Number(row.votes),
   };
 }

@@ -20,6 +20,9 @@ interface Row extends RowDataPacket {
   officer_note: string | null;
   created_at: Date;
   updated_at: Date;
+  due_at: Date;
+  votes: number;
+  stars: number | null;
 }
 
 /** Escape CSV + cegah injeksi rumus spreadsheet (sel yang diawali = + - @ dianggap rumus oleh Excel). */
@@ -65,7 +68,10 @@ export async function GET(req: Request) {
 
     const rows = await query<Row>(
       `SELECT r.ticket_no, r.title, c.name AS category_name, r.status, r.location_text, r.latitude, r.longitude,
-              u.name AS reporter_name, r.is_anonymous, a.name AS assigned_name, r.officer_note, r.created_at, r.updated_at
+              u.name AS reporter_name, r.is_anonymous, a.name AS assigned_name, r.officer_note, r.created_at, r.updated_at,
+              DATE_ADD(r.created_at, INTERVAL c.sla_hours HOUR) AS due_at,
+              (SELECT COUNT(*) FROM report_votes v WHERE v.report_id = r.id) AS votes,
+              (SELECT stars FROM report_ratings rt WHERE rt.report_id = r.id) AS stars
          FROM reports r
          JOIN categories c ON c.id = r.category_id
          JOIN users u ON u.id = r.user_id
@@ -76,7 +82,7 @@ export async function GET(req: Request) {
       params
     );
 
-    const header = ["Tiket", "Judul", "Kategori", "Status", "Lokasi", "Latitude", "Longitude", "Pelapor", "Anonim ke petugas", "Petugas", "Catatan terakhir", "Dibuat (UTC)", "Diperbarui (UTC)"];
+    const header = ["Tiket", "Judul", "Kategori", "Status", "Lokasi", "Latitude", "Longitude", "Pelapor", "Anonim ke petugas", "Petugas", "Catatan terakhir", "Dibuat (UTC)", "Diperbarui (UTC)", "Batas SLA (UTC)", "Terlambat", "Dukungan", "Bintang"];
     const lines = [header.map(cell).join(",")];
     for (const r of rows) {
       lines.push(
@@ -94,6 +100,10 @@ export async function GET(req: Request) {
           r.officer_note,
           new Date(r.created_at).toISOString(),
           new Date(r.updated_at).toISOString(),
+          new Date(r.due_at).toISOString(),
+          (r.status === "baru" || r.status === "diverifikasi" || r.status === "diproses") && new Date(r.due_at).getTime() < Date.now() ? "Ya" : "Tidak",
+          r.votes,
+          r.stars,
         ]
           .map(cell)
           .join(",")
