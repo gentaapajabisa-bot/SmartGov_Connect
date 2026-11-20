@@ -4,50 +4,45 @@ import { DEFAULT_EMERGENCY_CONTACTS } from "@/lib/purbalingga";
 
 export default function EmergencyBar() {
   return (
-    <section className="rounded-xl border border-red-500/30 bg-red-950/20 p-4 md:p-6">
-      <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <span className="inline-block rounded-full bg-red-600 px-2.5 py-0.5 text-xs font-semibold text-white">
-            DARURAT 24 JAM
-          </span>
-          <h2 className="mt-1 text-lg font-bold text-slate-900 dark:text-white">
-            Kontak Darurat Kabupaten Purbalingga
-          </h2>
-        </div>
-        <p className="text-xs text-slate-600 dark:text-slate-300">
-          Untuk kejadian mendesak, segera hubungi nomor di bawah ini:
+    <div className="sg-card">
+      <div style={{ marginBottom: "18px" }}>
+        <span
+          style={{
+            display: "inline-block",
+            padding: "4px 10px",
+            borderRadius: "999px",
+            background: "#dc2626",
+            color: "#fff",
+            fontSize: "11px",
+            fontWeight: 800,
+            marginBottom: "8px",
+          }}
+        >
+          SIAGA DARURAT 24 JAM
+        </span>
+        <h2 style={{ fontSize: "20px", margin: "0 0 4px", color: "#fff" }}>
+          Kontak Darurat Kabupaten Purbalingga
+        </h2>
+        <p style={{ fontSize: "13px", color: "#94a3b8", margin: 0 }}>
+          Ketuk nomor instansi di bawah ini untuk melakukan panggilan darurat secara langsung.
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="sg-emergency-grid">
         {DEFAULT_EMERGENCY_CONTACTS.map((item) => {
           const telHref = `tel:${item.phone_number.replace(/[^0-9+]/g, "")}`;
           return (
-            <a
-              key={item.id}
-              href={telHref}
-              className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-3.5 shadow-sm transition hover:border-red-500 dark:border-slate-800 dark:bg-slate-900"
-            >
-              <div className="pr-2">
-                <p className="text-xs font-medium text-red-600 dark:text-red-400">
-                  {item.category}
-                </p>
-                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                  {item.agency_name}
-                </p>
-                {item.address && (
-                  <p className="mt-0.5 line-clamp-1 text-xs text-slate-500 dark:text-slate-400">
-                    {item.address}
-                  </p>
-                )}
+            <a key={item.id} href={telHref} className="sg-emergency-item">
+              <div>
+                <p className="sg-emergency-cat">{item.category}</p>
+                <p className="sg-emergency-name">{item.agency_name}</p>
+                {item.address && <p className="sg-emergency-addr">{item.address}</p>}
               </div>
-              <span className="shrink-0 rounded-md bg-red-600 px-3 py-1.5 text-xs font-bold text-white">
-                {item.phone_number}
-              </span>
+              <span className="sg-call-pill">{item.phone_number}</span>
             </a>
           );
         })}
       </div>
-    </section>
+    </div>
   );
 }

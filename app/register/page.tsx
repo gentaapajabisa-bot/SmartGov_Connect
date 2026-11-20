@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
-export default function RegisterPage() {
-  redirect("/lapor");
+export default function RegisterRedirectPage() {
+  redirect("/login");
 }

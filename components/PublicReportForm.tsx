@@ -41,7 +41,7 @@ export default function PublicReportForm({
         setErrorMsg(null);
       },
       () => {
-        setErrorMsg("Izin lokasi ditolak. Anda tetap bisa mengisi alamat manual.");
+        setErrorMsg("Izin lokasi ditolak. Anda tetap dapat mengisi alamat secara manual.");
       }
     );
   };
@@ -56,7 +56,7 @@ export default function PublicReportForm({
       );
       setPhotos(cleanedFiles);
     } catch {
-      setErrorMsg("Gagal memproses foto bukti. Pastikan format JPG/PNG.");
+      setErrorMsg("Gagal memproses foto bukti. Pastikan format JPG atau PNG.");
     }
   };
 
@@ -100,27 +100,24 @@ export default function PublicReportForm({
 
   if (ticketResult) {
     return (
-      <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/20 p-6 text-center">
-        <p className="text-sm font-semibold text-emerald-500">
-          LAPORAN ANONIM BERHASIL TERKIRIM
+      <div className="sg-card sg-ticket-box">
+        <span className="sg-pill">Laporan Anonim Berhasil Diterima</span>
+        <h2 style={{ fontSize: "22px", margin: "8px 0 4px", color: "#fff" }}>
+          Simpan Kode Tiket Pengaduan Anda
+        </h2>
+        <div className="sg-ticket-code">{ticketResult}</div>
+        <p style={{ maxWidth: "480px", margin: "0 auto 20px", fontSize: "13px", color: "#cbd5e1" }}>
+          Identitas Anda tidak disimpan oleh sistem. Gunakan kode tiket di atas pada tab{" "}
+          <strong>Lacak Status Tiket</strong> untuk memantau progres penanganan dinas terkait.
         </p>
-        <h3 className="mt-2 text-xl font-bold text-slate-900 dark:text-white">
-          Simpan Nomor Tiket Anda
-        </h3>
-        <div className="my-4 inline-block rounded-lg border border-slate-700 bg-slate-900 px-6 py-3 font-mono text-2xl font-bold tracking-wider text-emerald-400">
-          {ticketResult}
-        </div>
-        <p className="mx-auto max-w-md text-xs text-slate-600 dark:text-slate-300">
-          Identitas Anda tidak dicatat oleh sistem. Gunakan nomor tiket di atas pada menu{" "}
-          <strong>Lacak Laporan</strong> untuk memantau tindak lanjut petugas.
-        </p>
-        <div className="mt-5 flex justify-center gap-3">
+        <div style={{ display: "flex", justifyContent: "center", gap: "12px", flexWrap: "wrap" }}>
           <button
             type="button"
             onClick={() => navigator.clipboard.writeText(ticketResult)}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
+            className="sg-submit-btn"
+            style={{ width: "auto", padding: "11px 22px" }}
           >
-            Salin Nomor Tiket
+            Salin Kode Tiket
           </button>
           <button
             type="button"
@@ -131,9 +128,9 @@ export default function PublicReportForm({
               setAddress("");
               setPhotos([]);
             }}
-            className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-200"
+            className="sg-tab"
           >
-            Buat Laporan Baru
+            Buat Laporan Lain
           </button>
         </div>
       </div>
@@ -141,58 +138,57 @@ export default function PublicReportForm({
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900"
-    >
-      <div className="rounded-lg bg-blue-500/10 p-3 text-xs text-blue-700 dark:text-blue-300">
-        <strong>Privasi Terjamin:</strong> Pelaporan ini 100% anonim. Tanpa login, tanpa nama,
-        email, maupun nomor HP. Metadata kamera pada foto otomatis dibersihkan.
-      </div>
-
-      {errorMsg && (
-        <div className="rounded-lg bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
-          {errorMsg}
-        </div>
-      )}
-
-      <div>
-        <label className="mb-1 block text-sm font-medium">Kategori Laporan *</label>
-        <select
-          required
-          value={categoryId}
-          onChange={(e) => setCategoryId(e.target.value)}
-          className="w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-        >
-          <option value="">-- Pilih Jenis Kejadian / Dinas Terkait --</option>
-          {categories.map((cat) => (
-            <option key={cat.id} value={cat.id}>
-              {cat.name} {cat.agency_name ? `(${cat.agency_name})` : ""}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div>
-        <label className="mb-1 block text-sm font-medium">Judul Singkat Laporan *</label>
-        <input
-          type="text"
-          required
-          placeholder="Contoh: Jalan berlubang cukup dalam di depan Balai Desa"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-        />
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
+    <form onSubmit={handleSubmit} className="sg-card">
+      <div className="sg-privacy-banner">
+        <span style={{ fontSize: "18px" }}>🛡️</span>
         <div>
-          <label className="mb-1 block text-sm font-medium">Kecamatan (Kab. Purbalingga) *</label>
+          <strong>100% Anonim &amp; Tanpa Akun:</strong> Warga tidak perlu login atau mengisi nama,
+          NIK, email, maupun nomor HP. Metadata kamera (EXIF) pada foto otomatis dihapus sebelum
+          dikirim ke dinas terkait.
+        </div>
+      </div>
+
+      {errorMsg && <div className="sg-alert-error">{errorMsg}</div>}
+
+      <div className="sg-grid-2">
+        <div className="sg-field">
+          <label className="sg-label">Kategori Kejadian / Dinas Tujuan *</label>
+          <select
+            required
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
+            className="sg-select"
+          >
+            <option value="">-- Pilih Jenis Laporan --</option>
+            {categories.map((cat) => (
+              <option key={cat.id} value={cat.id}>
+                {cat.name} {cat.agency_name ? `→ ${cat.agency_name}` : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="sg-field">
+          <label className="sg-label">Judul Singkat Laporan *</label>
+          <input
+            type="text"
+            required
+            placeholder="Contoh: Jalan berlubang parah di depan Balai Desa"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="sg-input"
+          />
+        </div>
+      </div>
+
+      <div className="sg-grid-2">
+        <div className="sg-field">
+          <label className="sg-label">Kecamatan (Kab. Purbalingga) *</label>
           <select
             required
             value={kecamatan}
             onChange={(e) => setKecamatan(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
+            className="sg-select"
           >
             {KECAMATAN_PURBALINGGA.map((kec) => (
               <option key={kec} value={kec}>
@@ -202,76 +198,70 @@ export default function PublicReportForm({
           </select>
         </div>
 
-        <div>
-          <label className="mb-1 block text-sm font-medium">Desa / Kelurahan *</label>
+        <div className="sg-field">
+          <label className="sg-label">Desa / Kelurahan *</label>
           <input
             type="text"
             required
             placeholder="Contoh: Kalikabong"
             value={desa}
             onChange={(e) => setDesa(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
+            className="sg-input"
           />
         </div>
       </div>
 
-      <div>
-        <div className="mb-1 flex items-center justify-between">
-          <label className="text-sm font-medium">Detail Alamat / Patokan Lokasi *</label>
-          <button
-            type="button"
-            onClick={handleGetLocation}
-            className="text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400"
-          >
-            {coords ? `Titik GPS Terkunci (${coords.lat}, ${coords.lng})` : "+ Ambil Titik GPS Saat Ini"}
+      <div className="sg-field">
+        <div className="sg-label-row">
+          <label className="sg-label">Detail Alamat / Patokan Lokasi *</label>
+          <button type="button" onClick={handleGetLocation} className="sg-gps-btn">
+            {coords ? `📍 GPS Terkunci (${coords.lat}, ${coords.lng})` : "📍 Ambil Titik GPS"}
           </button>
         </div>
         <input
           type="text"
           required
-          placeholder="Contoh: Jl. Raya Bojongsari KM 4, selatan pasar"
+          placeholder="Contoh: Jl. Raya Bojongsari KM 4, sebelah selatan pasar"
           value={address}
           onChange={(e) => setAddress(e.target.value)}
-          className="w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
+          className="sg-input"
         />
       </div>
 
-      <div>
-        <label className="mb-1 block text-sm font-medium">Uraian Kejadian *</label>
+      <div className="sg-field">
+        <label className="sg-label">Uraian Lengkap Kejadian *</label>
         <textarea
           required
           rows={4}
-          placeholder="Jelaskan kondisi di lapangan secara jelas..."
+          placeholder="Jelaskan kondisi lapangan, tingkat kerusakan, atau hal yang meresahkan warga..."
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          className="w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
+          className="sg-textarea"
         />
       </div>
 
-      <div>
-        <label className="mb-1 block text-sm font-medium">
-          Bukti Foto (Maks. 3 Foto, Otomatis Tanpa Metadata EXIF)
+      <div className="sg-field">
+        <label className="sg-label">
+          Lampiran Foto Bukti (Maks. 3 Foto — Metadata Kamera Dihapus Otomatis)
         </label>
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          multiple
-          onChange={handleFileChange}
-          className="w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-blue-600 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white"
-        />
-        {photos.length > 0 && (
-          <p className="mt-1 text-xs text-emerald-500">
-            {photos.length} foto siap diunggah (metadata perangkat telah dihapus).
-          </p>
-        )}
+        <div className="sg-file-box">
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            multiple
+            onChange={handleFileChange}
+            style={{ color: "#cbd5e1", fontSize: "13px" }}
+          />
+          {photos.length > 0 && (
+            <p style={{ margin: "8px 0 0", fontSize: "12px", color: "#34d399", fontWeight: 600 }}>
+              ✓ {photos.length} foto bersih siap diunggah
+            </p>
+          )}
+        </div>
       </div>
 
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-bold text-white transition hover:bg-blue-500 disabled:opacity-50"
-      >
-        {loading ? "Mengirim Laporan Anonim..." : "Kirim Laporan Sekarang"}
+      <button type="submit" disabled={loading} className="sg-submit-btn">
+        {loading ? "Mengirim Laporan ke Dinas Terkait..." : "Kirim Laporan Anonim Sekarang"}
       </button>
     </form>
   );
