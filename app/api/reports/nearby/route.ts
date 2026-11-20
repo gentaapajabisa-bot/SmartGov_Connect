@@ -1,11 +1,9 @@
 import type { RowDataPacket } from "mysql2";
-import { requireUser } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { HttpError, ok, run } from "@/lib/http";
 import type { NearbyReport, Status } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
-
 const RADIUS_M = 250;
 
 interface Row extends RowDataPacket {
@@ -18,23 +16,20 @@ interface Row extends RowDataPacket {
   voted: number;
 }
 
-// Laporan serupa yang masih berjalan di sekitar suatu titik, untuk mencegah laporan ganda.
-// Yang dikembalikan hanya judul, kategori, status, jarak, dan jumlah dukungan: tanpa identitas pelapor,
-// tanpa alamat, dan tanpa laporan milik pemohon sendiri.
 export async function GET(req: Request) {
   return run(async () => {
-    const user = await requireUser(["warga"]);
     const url = new URL(req.url);
     const lat = Number(url.searchParams.get("lat"));
     const lng = Number(url.searchParams.get("lng"));
+    const voterKey = (url.searchParams.get("voter_key") ?? "").slice(0, 64);
     if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
       throw new HttpError(400, "Koordinat tidak valid.");
     }
     const cat = Number(url.searchParams.get("category_id") ?? "");
 
-    const dLat = 0.003; // sekitar 330 m, melebihi radius agar tidak ada yang terlewat
+    const dLat = 0.003;
     const dLng = dLat / Math.max(Math.cos((lat * Math.PI) / 180), 0.01);
-    const params: unknown[] = [lat, lat, lng, user.id, user.id, lat - dLat, lat + dLat, lng - dLng, lng + dLng];
+    const params: unknown[] = [lat, lat, lng, voterKey, lat - dLat, lat + dLat, lng - dLng, lng + dLng];
     let catSql = "";
     if (Number.isInteger(cat) && cat > 0) {
       catSql = " AND r.category_id = ?";
@@ -49,11 +44,10 @@ export async function GET(req: Request) {
                 COS(RADIANS(?)) * COS(RADIANS(r.latitude)) * POW(SIN(RADIANS(r.longitude - ?) / 2), 2)
               )) AS dist,
               (SELECT COUNT(*) FROM report_votes v WHERE v.report_id = r.id) AS votes,
-              (SELECT COUNT(*) FROM report_votes v2 WHERE v2.report_id = r.id AND v2.user_id = ?) AS voted
+              (SELECT COUNT(*) FROM report_votes v2 WHERE v2.report_id = r.id AND v2.voter_key = ?) AS voted
          FROM reports r JOIN categories c ON c.id = r.category_id
         WHERE r.latitude IS NOT NULL AND r.longitude IS NOT NULL
           AND r.status IN ('baru','diverifikasi','diproses')
-          AND r.user_id <> ?
           AND r.latitude BETWEEN ? AND ? AND r.longitude BETWEEN ? AND ?
           AND r.created_at >= (UTC_TIMESTAMP() - INTERVAL 90 DAY)${catSql}
        HAVING dist <= ?

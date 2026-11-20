@@ -7,7 +7,7 @@ import { HttpError } from "./http";
 import type { Role, SessionUser } from "./types";
 
 export const COOKIE_NAME = "sgc_session";
-const MAX_AGE_SECONDS = 60 * 60 * 24 * 7; // 7 hari
+const MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 
 function secretKey(): Uint8Array {
   const secret = process.env.AUTH_SECRET;
@@ -44,16 +44,11 @@ interface UserRow extends RowDataPacket {
   id: number;
   name: string;
   email: string;
-  role: Role;
+  role: string;
   is_active: number;
   email_verified_at: Date | null;
 }
 
-/**
- * Membaca sesi dari cookie, lalu memuat ulang pengguna dari database.
- * Peran diambil dari database (bukan dari token) sehingga perubahan peran
- * atau penonaktifan akun berlaku seketika.
- */
 export async function getCurrentUser(): Promise<SessionUser | null> {
   const token = cookies().get(COOKIE_NAME)?.value;
   if (!token) return null;
@@ -68,7 +63,15 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
     );
     const row = rows[0];
     if (!row || !row.is_active) return null;
-    return { id: row.id, name: row.name, email: row.email, role: row.role, email_verified: row.email_verified_at !== null };
+    if (row.role !== "petugas" && row.role !== "admin") return null;
+
+    return {
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      role: row.role,
+      email_verified: row.email_verified_at !== null,
+    };
   } catch {
     return null;
   }
@@ -84,7 +87,6 @@ export async function requireUser(roles?: Role[]): Promise<SessionUser> {
 }
 
 let dummyHash: string | null = null;
-/** Dipakai agar waktu respons login tidak membocorkan apakah email terdaftar. */
 export async function burnPasswordCheck(password: string) {
   dummyHash ??= await bcrypt.hash("kata-sandi-pengecoh-1", 12);
   await bcrypt.compare(password, dummyHash);

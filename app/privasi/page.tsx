@@ -1,53 +1,38 @@
 import Link from "next/link";
 import Header from "@/components/Header";
-import { getCurrentUser } from "@/lib/auth";
 
-export const metadata = { title: "Kebijakan Privasi - SmartGov Connect" };
+export const metadata = { title: "Kebijakan Privasi & Anonimitas - SmartGov Connect" };
 
-export default async function PrivacyPage() {
-  const user = await getCurrentUser().catch(() => null);
+export default function PrivasiPage() {
   return (
     <>
-      <Header user={user} />
-      <main className="container page-in" style={{ maxWidth: 820, padding: "28px 0 60px" }}>
-        <h1>Kebijakan Privasi</h1>
-        <p className="muted">
-          Ringkasan cara SmartGov Connect memperlakukan data pribadi Anda, mengacu pada UU No. 27 Tahun 2022 tentang
-          Pelindungan Data Pribadi. Naskah ini adalah templat: sesuaikan nama instansi, kontak, dan masa simpan dengan
-          kebijakan kelurahan Anda dan konsultasikan dengan bagian hukum sebelum dipakai resmi.
-        </p>
+      <Header />
+      <main className="container dash page-in" style={{ maxWidth: 820 }}>
+        <div className="card">
+          <h1>Kebijakan Privasi &amp; Anonimitas Warga</h1>
+          <p className="muted">
+            SmartGov Connect dirancang dengan prinsip <strong>Privacy-by-Design</strong> untuk melindungi identitas warga saat menyampaikan pengaduan.
+          </p>
 
-        <div className="card" style={{ marginTop: 18 }}>
-          <h2>Data yang kami kumpulkan</h2>
-          <ul>
-            <li>Akun: nama, email, nomor HP (opsional), dan kata sandi yang disimpan dalam bentuk hash.</li>
-            <li>Laporan: judul, uraian, kategori, lokasi (teks dan koordinat bila Anda tandai di peta), serta foto yang Anda unggah.</li>
-            <li>Teknis: alamat IP sementara untuk pembatasan percobaan masuk, dan cookie sesi.</li>
-          </ul>
+          <h3>1. Tanpa Akun &amp; Tanpa Identitas Pribadi Warga</h3>
+          <p>
+            Warga tidak perlu membuat akun atau login untuk mengirim pengaduan. Formulir pengaduan tidak meminta maupun menyimpan nama lengkap, NIK, alamat email, atau nomor telepon pelapor.
+          </p>
 
-          <h2>Tujuan penggunaan</h2>
-          <p>Data dipakai untuk memproses dan menindaklanjuti pengaduan, memberi pembaruan status, mengamankan akun, dan menyusun statistik layanan.</p>
+          <h3>2. Mekanisme Kode Tiket &amp; Token Perangkat</h3>
+          <p>
+            Setiap pengaduan menghasilkan nomor tiket unik (<code>SGC-YYYYMMDD-XXXXXX</code>) dan token keamanan lokal yang disimpan hanya di peramban perangkat Anda untuk memantau status serta memberikan penilaian layanan setelah laporan selesai.
+          </p>
 
-          <h2>Siapa yang dapat melihat</h2>
-          <ul>
-            <li>Warga hanya melihat laporan miliknya sendiri.</li>
-            <li>Petugas dan admin kelurahan melihat laporan untuk menindaklanjuti. Pada laporan anonim, nama pelapor disembunyikan dari petugas.</li>
-            <li>Email dan nomor HP tidak ditampilkan pada daftar maupun detail laporan.</li>
-            <li>Tindakan admin dicatat dalam log audit.</li>
-            <li>Bila Anda mengaktifkannya, pembaruan status dikirim ke email atau WhatsApp Anda lewat penyedia layanan pengiriman pihak ketiga. Pesan hanya memuat nomor tiket dan status. Anda dapat menonaktifkannya kapan saja di tab Notifikasi.</li>
-            <li>Saat Anda menandai lokasi di peta, warga lain yang menandai titik berdekatan dapat melihat judul, kategori, status, dan jarak perkiraan laporan Anda yang masih berjalan agar tidak membuat laporan ganda. Nama pelapor, alamat, dan uraian tidak ditampilkan.</li>
-          </ul>
+          <h3>3. Akun Terbatas untuk Petugas &amp; Admin</h3>
+          <p>
+            Autentikasi login hanya digunakan oleh Petugas Kelurahan dan Admin yang berwenang untuk memproses pengaduan, memperbarui status tindak lanjut, dan memantau kinerja SLA kelurahan.
+          </p>
 
-          <h2>Hak Anda</h2>
-          <p>Anda dapat meminta akses, perbaikan, atau penghapusan data pribadi dengan menghubungi admin kelurahan. Penghapusan dapat dibatasi bila data diperlukan untuk kewajiban pencatatan layanan publik.</p>
-
-          <h2>Penyimpanan dan keamanan</h2>
-          <p>Data disimpan di basis data terenkripsi saat transit (TLS). Akses dibatasi menurut peran. Meski demikian tidak ada sistem yang sepenuhnya bebas risiko; laporkan dugaan penyalahgunaan kepada admin.</p>
-
-          <h2>Kontak</h2>
-          <p>[Isi dengan nama kelurahan, alamat, dan email pejabat pelindungan data.]</p>
+          <p style={{ marginTop: 20 }}>
+            <Link href="/lapor" className="btn">Buka Portal Layanan Warga</Link>
+          </p>
         </div>
-        <p style={{ marginTop: 18 }}><Link href="/">Kembali ke beranda</Link></p>
       </main>
     </>
   );

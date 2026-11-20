@@ -1,9 +1,8 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2";
-import { requireUser } from "@/lib/auth";
+import { getCurrentUser, requireUser } from "@/lib/auth";
 import { query, withTransaction } from "@/lib/db";
 import { HttpError, ok, parseId, readJson, run } from "@/lib/http";
-import { notify, statusMessage } from "@/lib/notify";
-import { notifyExternal } from "@/lib/outbound";
+import { notify } from "@/lib/notify";
 import { REPORT_JOINS, REPORT_SELECT, toSummary, type ReportRow } from "@/lib/reports";
 import { STATUS_LABEL, type HistoryItem, type RatingData, type ReportDetailData, type Status } from "@/lib/types";
 import { reportUpdateSchema } from "@/lib/validation";
@@ -22,16 +21,17 @@ interface HistoryRow extends RowDataPacket {
   id: number;
   status: Status;
   note: string | null;
-  changed_by: number;
-  actor_name: string;
+  changed_by: number | null;
+  actor_name: string | null;
   created_at: Date;
 }
 
 type Ctx = { params: { id: string } };
 
+// Detail laporan bisa diakses staf yang login atau warga publik/anonim tanpa identitas pelapor.
 export async function GET(_req: Request, { params }: Ctx) {
   return run(async () => {
-    const user = await requireUser();
+    const user = await getCurrentUser();
     const id = parseId(params.id);
 
     const rows = await query<DetailRow>(
@@ -41,41 +41,44 @@ export async function GET(_req: Request, { params }: Ctx) {
       [id]
     );
     const row = rows[0];
-    // Warga yang bukan pemilik mendapat 404 (bukan 403) agar keberadaan laporan tidak bocor.
-    if (!row || (user.role === "warga" && row.user_id !== user.id)) {
-      throw new HttpError(404, "Laporan tidak ditemukan.");
-    }
+    if (!row) throw new HttpError(404, "Laporan tidak ditemukan.");
 
     const [historyRows, photoRows, ratingRows] = await Promise.all([
       query<HistoryRow>(
         `SELECT h.id, h.status, h.note, h.changed_by, u.name AS actor_name, h.created_at
            FROM report_status_history h
-           JOIN users u ON u.id = h.changed_by
+           LEFT JOIN users u ON u.id = h.changed_by
           WHERE h.report_id = ?
           ORDER BY h.created_at, h.id`,
         [id]
       ),
-      query<RowDataPacket & { id: number; kind: "report" | "proof" }>("SELECT id, kind FROM report_photos WHERE report_id = ? ORDER BY id", [id]),
-      query<RowDataPacket & { stars: number; comment: string | null }>("SELECT stars, comment FROM report_ratings WHERE report_id = ? LIMIT 1", [id]),
+      query<RowDataPacket & { id: number; kind: "report" | "proof" }>(
+        "SELECT id, kind FROM report_photos WHERE report_id = ? ORDER BY id",
+        [id]
+      ),
+      query<RowDataPacket & { stars: number; comment: string | null }>(
+        "SELECT stars, comment FROM report_ratings WHERE report_id = ? LIMIT 1",
+        [id]
+      ),
     ]);
-    const rating: RatingData | null = ratingRows[0] ? { stars: Number(ratingRows[0].stars), comment: ratingRows[0].comment } : null;
+    const rating: RatingData | null = ratingRows[0]
+      ? { stars: Number(ratingRows[0].stars), comment: ratingRows[0].comment }
+      : null;
 
     const history: HistoryItem[] = historyRows.map((h) => ({
       id: h.id,
       status: h.status,
       note: h.note,
-      // Warga melihat label umum; nama petugas hanya ditampilkan kepada staf.
-      actor:
-        user.role === "warga"
-          ? h.changed_by === user.id
-            ? "Anda"
-            : "Petugas Kelurahan"
-          : h.actor_name,
+      actor: !user
+        ? h.changed_by === null
+          ? "Pelapor Anonim"
+          : "Petugas Kelurahan"
+        : h.actor_name ?? "Pelapor Anonim",
       created_at: new Date(h.created_at).toISOString(),
     }));
 
     const detail: ReportDetailData = {
-      ...toSummary(user, row),
+      ...toSummary(user ? user.role : "warga", row),
       description: row.description,
       latitude: row.latitude === null ? null : Number(row.latitude),
       longitude: row.longitude === null ? null : Number(row.longitude),
@@ -96,28 +99,24 @@ export async function PATCH(req: Request, { params }: Ctx) {
     const id = parseId(params.id);
     const data = reportUpdateSchema.parse(await readJson(req));
     const note = data.note?.trim() || null;
-    let external: { userId: number; text: string } | null = null;
 
     await withTransaction(async (conn) => {
-      const [found] = await conn.query<(RowDataPacket & { status: Status; ticket_no: string; user_id: number; assigned_to: number | null })[]>(
-        "SELECT status, ticket_no, user_id, assigned_to FROM reports WHERE id = ? FOR UPDATE",
+      const [found] = await conn.query<(RowDataPacket & { status: Status; ticket_no: string; assigned_to: number | null })[]>(
+        "SELECT status, ticket_no, assigned_to FROM reports WHERE id = ? FOR UPDATE",
         [id]
       );
       const current = found[0];
       if (!current) throw new HttpError(404, "Laporan tidak ditemukan.");
 
-      // Laporan yang sudah ditutup hanya boleh diubah kembali oleh admin.
       if ((current.status === "selesai" || current.status === "ditolak") && user.role !== "admin") {
         throw new HttpError(409, "Laporan sudah ditutup. Hanya admin yang dapat mengubahnya kembali.");
       }
 
       let status: Status = current.status;
 
-      // --- Penugasan ---
       if (data.assigned_to !== undefined && data.assigned_to !== current.assigned_to) {
         const target = data.assigned_to;
         if (target === null) {
-          // Melepas penugasan: admin bebas; petugas hanya melepas tugas miliknya sendiri.
           if (user.role !== "admin" && current.assigned_to !== user.id) {
             throw new HttpError(403, "Anda hanya dapat melepas penugasan milik Anda sendiri.");
           }
@@ -146,7 +145,6 @@ export async function PATCH(req: Request, { params }: Ctx) {
         }
       }
 
-      // --- Status dan/atau catatan ---
       const statusChanged = data.status !== undefined && data.status !== current.status;
       if (statusChanged || note) {
         if (!statusChanged && !note) throw new HttpError(400, "Tidak ada perubahan.");
@@ -159,19 +157,11 @@ export async function PATCH(req: Request, { params }: Ctx) {
           "INSERT INTO report_status_history (report_id, status, note, changed_by) VALUES (?, ?, ?, ?)",
           [id, status, note, user.id]
         );
-        // Beri tahu pelapor (tanpa membuka identitas petugas).
-        if (statusChanged) {
-          await notify(conn, current.user_id, id, statusMessage(current.ticket_no, status));
-          external = { userId: current.user_id, text: statusMessage(current.ticket_no, status) };
-        } else {
-          await notify(conn, current.user_id, id, `Ada catatan baru pada laporan ${current.ticket_no} (status: ${STATUS_LABEL[status]}).`);
+        if (current.assigned_to && current.assigned_to !== user.id) {
+          await notify(conn, current.assigned_to, id, `Laporan ${current.ticket_no} diperbarui ke ${STATUS_LABEL[status]}.`);
         }
       }
     });
-
-    // Email/WhatsApp dikirim setelah transaksi berhasil; kegagalannya tidak memengaruhi hasil.
-    const ext = external as { userId: number; text: string } | null;
-    if (ext) await notifyExternal(req, ext.userId, "Pembaruan laporan Anda", ext.text);
 
     return ok({ success: true });
   });

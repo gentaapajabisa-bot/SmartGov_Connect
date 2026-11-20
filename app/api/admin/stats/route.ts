@@ -8,17 +8,15 @@ export const dynamic = "force-dynamic";
 
 const ALLOWED_DAYS = [7, 14, 30, 90];
 
-// Statistik dengan filter periode (days) dan kategori (category_id, opsional).
 export async function GET(req: Request) {
   return run(async () => {
-    await requireUser(["admin"]);
+    await requireUser(["petugas", "admin"]);
     const url = new URL(req.url);
     const daysParam = Number(url.searchParams.get("days"));
     const days = ALLOWED_DAYS.includes(daysParam) ? daysParam : 14;
     const catParam = Number(url.searchParams.get("category_id"));
     const categoryId = Number.isInteger(catParam) && catParam > 0 ? catParam : null;
 
-    // Semua angka laporan dibatasi pada rentang waktu dan (bila ada) kategori yang dipilih.
     const scope = `r.created_at >= (UTC_TIMESTAMP() - INTERVAL ${days} DAY)${categoryId ? " AND r.category_id = ?" : ""}`;
     const sp = categoryId ? [categoryId] : [];
 
@@ -62,7 +60,6 @@ export async function GET(req: Request) {
           GROUP BY u.id, u.name ORDER BY open_n DESC, u.name`,
         sp
       ),
-      // Keterlambatan adalah kondisi saat ini, tidak dibatasi periode.
       query<RowDataPacket & { n: number }>(
         `SELECT COUNT(*) AS n FROM reports r JOIN categories c ON c.id = r.category_id
           WHERE r.status IN ('baru','diverifikasi','diproses')
@@ -88,8 +85,8 @@ export async function GET(req: Request) {
     ]);
     const slaTotal = Number(sla[0]?.total ?? 0);
     const avgStars = rating[0]?.avg_stars;
-
     const avgMin = resolve[0]?.avg_min;
+
     const stats: Stats = {
       days,
       categoryId,

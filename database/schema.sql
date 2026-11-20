@@ -2,24 +2,26 @@
 -- SmartGov Connect - skema database (TiDB / MySQL-compatible)
 -- Jalankan di SQL Editor TiDB Cloud, atau dengan: npm run db:init
 --
--- Catatan: relasi antar tabel dijaga di lapisan aplikasi dan indeks,
--- tanpa FOREIGN KEY, agar kompatibel di semua versi TiDB Cloud.
+-- Privasi & Anonimitas Warga:
+--  - Warga tidak memiliki akun di tabel users (role hanya 'petugas' dan 'admin').
+--  - Laporan tidak menyimpan nama, NIK, email, atau nomor HP pelapor.
+--  - Pelacakan & penilaian warga menggunakan ticket_no + device_token_hash.
 -- =====================================================================
 
 CREATE TABLE IF NOT EXISTS users (
-  id            BIGINT       NOT NULL AUTO_INCREMENT,
-  name          VARCHAR(100) NOT NULL,
-  email         VARCHAR(150) NOT NULL,
-  phone         VARCHAR(20)  NULL,
-  password_hash VARCHAR(100) NOT NULL,
-  role          ENUM('warga','petugas','admin') NOT NULL DEFAULT 'warga',
-  is_active     TINYINT(1)   NOT NULL DEFAULT 1,
-  email_verified_at TIMESTAMP NULL,
-  consent_at    TIMESTAMP    NULL,
-  notify_email  TINYINT(1)   NOT NULL DEFAULT 1,  -- kirim pembaruan status ke email (hanya bila email terverifikasi)
-  notify_wa     TINYINT(1)   NOT NULL DEFAULT 0,  -- kirim pembaruan lewat WhatsApp (opt-in, perlu nomor HP)
-  created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  id                BIGINT       NOT NULL AUTO_INCREMENT,
+  name              VARCHAR(100) NOT NULL,
+  email             VARCHAR(150) NOT NULL,
+  phone             VARCHAR(20)  NULL,
+  password_hash     VARCHAR(100) NOT NULL,
+  role              ENUM('petugas','admin') NOT NULL DEFAULT 'petugas',
+  is_active         TINYINT(1)   NOT NULL DEFAULT 1,
+  email_verified_at TIMESTAMP    NULL,
+  consent_at        TIMESTAMP    NULL,
+  notify_email      TINYINT(1)   NOT NULL DEFAULT 1,
+  notify_wa         TINYINT(1)   NOT NULL DEFAULT 0,
+  created_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_users_email (email),
   KEY idx_users_role (role)
@@ -29,7 +31,7 @@ CREATE TABLE IF NOT EXISTS categories (
   id          BIGINT       NOT NULL AUTO_INCREMENT,
   name        VARCHAR(80)  NOT NULL,
   description VARCHAR(255) NULL,
-  sla_hours   INT          NOT NULL DEFAULT 168,  -- target waktu penyelesaian (jam) sejak laporan masuk
+  sla_hours   INT          NOT NULL DEFAULT 168,
   is_active   TINYINT(1)   NOT NULL DEFAULT 1,
   created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -37,48 +39,46 @@ CREATE TABLE IF NOT EXISTS categories (
 );
 
 CREATE TABLE IF NOT EXISTS reports (
-  id            BIGINT        NOT NULL AUTO_INCREMENT,
-  ticket_no     VARCHAR(30)   NOT NULL,
-  user_id       BIGINT        NOT NULL,
-  category_id   BIGINT        NOT NULL,
-  title         VARCHAR(150)  NOT NULL,
-  description   TEXT          NOT NULL,
-  location_text VARCHAR(255)  NOT NULL,
-  latitude      DECIMAL(9,6)  NULL,
-  longitude     DECIMAL(9,6)  NULL,
-  photo_url     VARCHAR(500)  NULL,  -- dicadangkan untuk fitur unggah foto (belum aktif)
-  is_anonymous  TINYINT(1)    NOT NULL DEFAULT 0,
-  status        ENUM('baru','diverifikasi','diproses','selesai','ditolak') NOT NULL DEFAULT 'baru',
-  officer_note  TEXT          NULL,
-  handled_by    BIGINT        NULL,
-  assigned_to   BIGINT        NULL,  -- petugas yang ditugaskan menangani laporan
-  created_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  id                BIGINT        NOT NULL AUTO_INCREMENT,
+  ticket_no         VARCHAR(30)   NOT NULL,
+  device_token_hash CHAR(64)      NOT NULL,
+  user_id           BIGINT        NULL,
+  category_id       BIGINT        NOT NULL,
+  title             VARCHAR(150)  NOT NULL,
+  description       TEXT          NOT NULL,
+  location_text     VARCHAR(255)  NOT NULL,
+  latitude          DECIMAL(9,6)  NULL,
+  longitude         DECIMAL(9,6)  NULL,
+  photo_url         VARCHAR(500)  NULL,
+  is_anonymous      TINYINT(1)    NOT NULL DEFAULT 1,
+  status            ENUM('baru','diverifikasi','diproses','selesai','ditolak') NOT NULL DEFAULT 'baru',
+  officer_note      TEXT          NULL,
+  handled_by        BIGINT        NULL,
+  assigned_to       BIGINT        NULL,
+  created_at        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_reports_ticket (ticket_no),
-  KEY idx_reports_user (user_id, created_at),
   KEY idx_reports_status (status, created_at),
   KEY idx_reports_category (category_id),
   KEY idx_reports_assigned (assigned_to, status)
 );
 
 CREATE TABLE IF NOT EXISTS report_status_history (
-  id         BIGINT       NOT NULL AUTO_INCREMENT,
-  report_id  BIGINT       NOT NULL,
+  id         BIGINT        NOT NULL AUTO_INCREMENT,
+  report_id  BIGINT        NOT NULL,
   status     ENUM('baru','diverifikasi','diproses','selesai','ditolak') NOT NULL,
   note       VARCHAR(1000) NULL,
-  changed_by BIGINT       NOT NULL,
-  created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  changed_by BIGINT        NULL,
+  created_at TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY idx_history_report (report_id, created_at)
 );
 
--- Foto bukti laporan. Disimpan di database (sudah dikompres di sisi klien) dan hanya
--- disajikan lewat API yang memeriksa hak akses, jadi tidak ada URL publik.
 CREATE TABLE IF NOT EXISTS report_photos (
   id         BIGINT      NOT NULL AUTO_INCREMENT,
   report_id  BIGINT      NOT NULL,
-  kind       VARCHAR(10) NOT NULL DEFAULT 'report',  -- 'report' = foto pelapor, 'proof' = bukti penyelesaian dari petugas
+  kind       VARCHAR(10) NOT NULL DEFAULT 'report',
   mime       VARCHAR(30) NOT NULL DEFAULT 'image/jpeg',
   size_bytes INT         NOT NULL,
   data       MEDIUMBLOB  NOT NULL,
@@ -87,7 +87,6 @@ CREATE TABLE IF NOT EXISTS report_photos (
   KEY idx_photos_report (report_id)
 );
 
--- Notifikasi di dalam aplikasi (perubahan status, penugasan).
 CREATE TABLE IF NOT EXISTS notifications (
   id         BIGINT       NOT NULL AUTO_INCREMENT,
   user_id    BIGINT       NOT NULL,
@@ -99,7 +98,6 @@ CREATE TABLE IF NOT EXISTS notifications (
   KEY idx_notif_user (user_id, is_read, created_at)
 );
 
--- Token sekali pakai untuk reset kata sandi dan verifikasi email. Hanya hash-nya yang disimpan.
 CREATE TABLE IF NOT EXISTS auth_tokens (
   id         BIGINT      NOT NULL AUTO_INCREMENT,
   user_id    BIGINT      NOT NULL,
@@ -113,7 +111,6 @@ CREATE TABLE IF NOT EXISTS auth_tokens (
   KEY idx_tokens_user (user_id, kind)
 );
 
--- Penghitung pembatasan percobaan (login, daftar, lupa kata sandi).
 CREATE TABLE IF NOT EXISTS rate_limits (
   k        CHAR(64)  NOT NULL,
   hits     INT       NOT NULL DEFAULT 0,
@@ -121,7 +118,6 @@ CREATE TABLE IF NOT EXISTS rate_limits (
   PRIMARY KEY (k)
 );
 
--- Catatan audit tindakan admin.
 CREATE TABLE IF NOT EXISTS audit_log (
   id          BIGINT       NOT NULL AUTO_INCREMENT,
   actor_id    BIGINT       NOT NULL,
@@ -134,19 +130,15 @@ CREATE TABLE IF NOT EXISTS audit_log (
   KEY idx_audit_created (created_at)
 );
 
--- Dukungan warga pada laporan orang lain (satu dukungan per warga per laporan).
 CREATE TABLE IF NOT EXISTS report_votes (
-  report_id  BIGINT    NOT NULL,
-  user_id    BIGINT    NOT NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (report_id, user_id),
-  KEY idx_votes_user (user_id)
+  report_id  BIGINT      NOT NULL,
+  voter_key  VARCHAR(64) NOT NULL,
+  created_at TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (report_id, voter_key)
 );
 
--- Penilaian warga setelah laporan selesai (satu per laporan).
 CREATE TABLE IF NOT EXISTS report_ratings (
   report_id  BIGINT       NOT NULL,
-  user_id    BIGINT       NOT NULL,
   stars      TINYINT      NOT NULL,
   comment    VARCHAR(500) NULL,
   created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -154,11 +146,10 @@ CREATE TABLE IF NOT EXISTS report_ratings (
   PRIMARY KEY (report_id)
 );
 
--- Kategori awal (aman dijalankan berulang)
-INSERT IGNORE INTO categories (name, description) VALUES
-  ('Jalan & Infrastruktur', 'Jalan berlubang, trotoar rusak, jembatan, drainase'),
-  ('Kebersihan & Sampah',   'Tumpukan sampah, TPS penuh, saluran tersumbat'),
-  ('Penerangan Jalan',      'Lampu jalan mati atau rusak'),
-  ('Keamanan & Ketertiban', 'Gangguan keamanan lingkungan'),
-  ('Pelayanan Administrasi','Keluhan layanan KTP, KK, surat pengantar'),
-  ('Lainnya',               'Pengaduan di luar kategori di atas');
+INSERT IGNORE INTO categories (name, description, sla_hours) VALUES
+  ('Jalan & Infrastruktur', 'Jalan berlubang, trotoar rusak, jembatan, drainase', 168),
+  ('Kebersihan & Sampah',   'Tumpukan sampah, TPS penuh, saluran tersumbat', 72),
+  ('Penerangan Jalan',      'Lampu jalan mati atau rusak', 72),
+  ('Keamanan & Ketertiban', 'Gangguan keamanan lingkungan', 24),
+  ('Pelayanan Administrasi','Keluhan layanan KTP, KK, surat pengantar', 72),
+  ('Lainnya',               'Pengaduan di luar kategori di atas', 168);

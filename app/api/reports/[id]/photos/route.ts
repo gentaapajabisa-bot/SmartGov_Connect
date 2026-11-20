@@ -1,32 +1,37 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2";
-import { requireUser } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import { pool, query } from "@/lib/db";
 import { HttpError, ok, parseId, run } from "@/lib/http";
+import { hashDeviceToken } from "@/lib/reports";
 
-const MAX_BYTES = 800 * 1024; // klien mengompres ke JPEG <= ~600 KB; batas server lebih longgar
+const MAX_BYTES = 800 * 1024;
 const MAX_PHOTOS = 3;
 
-// Warga pemilik laporan mengunggah foto laporan; petugas yang ditugaskan (atau admin) mengunggah
-// foto bukti penyelesaian. Isi permintaan berupa JPEG mentah.
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   return run(async () => {
-    const user = await requireUser();
+    const user = await getCurrentUser();
     const reportId = parseId(params.id);
-    const staff = user.role !== "warga";
+    const staff = Boolean(user);
     const kind = staff ? "proof" : "report";
 
-    const found = await query<RowDataPacket & { user_id: number; status: string; assigned_to: number | null }>(
-      "SELECT user_id, status, assigned_to FROM reports WHERE id = ? LIMIT 1",
+    const found = await query<RowDataPacket & { device_token_hash: string; status: string; assigned_to: number | null }>(
+      "SELECT device_token_hash, status, assigned_to FROM reports WHERE id = ? LIMIT 1",
       [reportId]
     );
     const rep = found[0];
-    if (!rep || (!staff && rep.user_id !== user.id)) throw new HttpError(404, "Laporan tidak ditemukan.");
-    if (staff) {
+    if (!rep) throw new HttpError(404, "Laporan tidak ditemukan.");
+
+    if (staff && user) {
       if (user.role === "petugas" && rep.assigned_to !== user.id) {
         throw new HttpError(403, "Hanya petugas yang ditugaskan (atau admin) yang dapat mengunggah bukti penyelesaian.");
       }
       if (rep.status !== "diproses" && rep.status !== "selesai") {
         throw new HttpError(409, "Bukti penyelesaian hanya dapat diunggah saat laporan diproses atau selesai.");
+      }
+    } else {
+      const deviceToken = (req.headers.get("x-device-token") ?? "").trim();
+      if (!deviceToken || hashDeviceToken(deviceToken) !== rep.device_token_hash) {
+        throw new HttpError(403, "Token perangkat tidak valid untuk mengunggah foto laporan.");
       }
     }
 
@@ -42,7 +47,6 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const buf = Buffer.from(await req.arrayBuffer());
     if (buf.length === 0) throw new HttpError(400, "Berkas foto kosong.");
     if (buf.length > MAX_BYTES) throw new HttpError(413, "Ukuran foto terlalu besar (maksimal 800 KB setelah dikompres).");
-    // Periksa tanda tangan berkas (bukan hanya header Content-Type yang bisa dipalsukan).
     if (!(buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff)) throw new HttpError(400, "Berkas bukan gambar JPEG yang valid.");
 
     const [res] = await pool().query<ResultSetHeader>(

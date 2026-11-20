@@ -17,6 +17,7 @@ export default function Header({ user }: { user?: SessionUser | null }) {
           <div className="header-user">
             <ThemeToggle />
             <NotificationBell />
+            <Link href="/dashboard" className="btn btn-light btn-sm">Dashboard</Link>
             <span>{user.name}</span>
             <span className="role-chip">{ROLE_LABEL[user.role]}</span>
             <LogoutButton />
@@ -24,8 +25,8 @@ export default function Header({ user }: { user?: SessionUser | null }) {
         ) : (
           <nav className="header-user">
             <ThemeToggle />
-            <Link href="/login" className="btn btn-ghost btn-sm">Masuk</Link>
-            <Link href="/register" className="btn btn-light btn-sm">Daftar</Link>
+            <Link href="/lapor" className="btn btn-sm">Portal Warga</Link>
+            <Link href="/login" className="btn btn-ghost btn-sm">Masuk Staf</Link>
           </nav>
         )}
       </div>

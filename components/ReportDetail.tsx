@@ -1,7 +1,8 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { STATUSES, STATUS_LABEL, type ReportDetailData, type Role, type StaffUser, type Status } from "@/lib/types";
+import { getDeviceTokenForReport } from "@/lib/deviceReports";
+import { STATUSES, STATUS_LABEL, type ReportDetailData, type ViewerRole, type StaffUser, type Status } from "@/lib/types";
 import { compressImage } from "@/lib/image";
 import { SlaBadge, Stars, StatusBadge, api, formatDate } from "./ui";
 
@@ -12,7 +13,7 @@ export default function ReportDetail({
   onChanged,
 }: {
   id: number;
-  role: Role;
+  role: ViewerRole;
   userId?: number;
   onChanged: () => void;
 }) {
@@ -26,6 +27,7 @@ export default function ReportDetail({
   const [stars, setStars] = useState(0);
   const [comment, setComment] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [deviceToken, setDeviceToken] = useState<string | null>(null);
   const isStaff = role === "petugas" || role === "admin";
 
   const load = useCallback(async () => {
@@ -37,6 +39,7 @@ export default function ReportDetail({
       setAssignee(d.report.assigned_to ? String(d.report.assigned_to) : "");
       setStars(d.report.rating?.stars ?? 0);
       setComment(d.report.rating?.comment ?? "");
+      setDeviceToken(getDeviceTokenForReport(d.report.id) || getDeviceTokenForReport(d.report.ticket_no));
     } catch (e) {
       setReport(null);
       setError((e as Error).message);
@@ -48,7 +51,6 @@ export default function ReportDetail({
     load();
   }, [load]);
 
-  // Admin memilih petugas dari daftar; petugas biasa hanya bisa mengambil/melepas untuk dirinya.
   useEffect(() => {
     if (role !== "admin") return;
     api<{ staff: StaffUser[] }>("/api/staff")
@@ -78,11 +80,15 @@ export default function ReportDetail({
     e.preventDefault();
     const form = e.currentTarget;
     const note = String(new FormData(form).get("note") ?? "");
-    const okay = await patch({ status, note }, "Perubahan tersimpan. Pelapor akan menerima notifikasi.");
+    const okay = await patch({ status, note }, "Perubahan tersimpan.");
     if (okay) form.reset();
   }
 
   async function sendRating() {
+    if (!deviceToken) {
+      setError("Penilaian hanya dapat dikirim dari perangkat yang membuat laporan ini.");
+      return;
+    }
     if (stars < 1) {
       setError("Pilih jumlah bintang terlebih dahulu.");
       return;
@@ -91,9 +97,12 @@ export default function ReportDetail({
     setSaved("");
     setBusy(true);
     try {
-      await api(`/api/reports/${id}/rating`, { body: { stars, comment: comment.trim() || undefined } });
+      await api(`/api/reports/${id}/rating`, {
+        body: { device_token: deviceToken, stars, comment: comment.trim() || undefined },
+      });
       setSaved("Terima kasih atas penilaian Anda.");
       await load();
+      onChanged();
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -134,7 +143,7 @@ export default function ReportDetail({
   return (
     <div className="card detail">
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        <span style={{ fontFamily: "ui-monospace, monospace", fontSize: "0.88rem" }}>{report.ticket_no}</span>
+        <span style={{ fontFamily: "ui-monospace, monospace", fontSize: "0.88rem" }}>#{report.ticket_no}</span>
         <StatusBadge status={report.status} />
       </div>
       <h2 style={{ marginTop: 8 }}>{report.title}</h2>
@@ -182,10 +191,10 @@ export default function ReportDetail({
             </>
           )}
         </dd>
+        <dt>Pelapor</dt>
+        <dd>Warga Anonim (identitas dilindungi)</dd>
         {isStaff && (
           <>
-            <dt>Pelapor</dt>
-            <dd>{report.reporter_name ?? (report.is_anonymous ? "Anonim (disembunyikan)" : "-")}</dd>
             <dt>Petugas</dt>
             <dd>{report.assigned_name ?? "Belum ditugaskan"}</dd>
           </>
@@ -273,7 +282,7 @@ export default function ReportDetail({
         </div>
       )}
 
-      {role === "warga" && report.status === "selesai" && (
+      {role === "warga" && report.status === "selesai" && deviceToken && (
         <div className="panel">
           <h3 style={{ fontSize: "1rem" }}>Penilaian Anda</h3>
           {error && <div className="alert alert-error" role="alert">{error}</div>}
@@ -303,7 +312,7 @@ export default function ReportDetail({
         </div>
       )}
 
-      {isStaff && report.rating && (
+      {report.rating && (isStaff || !deviceToken) && (
         <div className="panel">
           <h3 style={{ fontSize: "1rem" }}>Penilaian pelapor</h3>
           <Stars value={report.rating.stars} />
@@ -331,7 +340,7 @@ export default function ReportDetail({
               <div className="field">
                 <label htmlFor="note">Catatan tindak lanjut</label>
                 <textarea id="note" name="note" maxLength={1000} placeholder="Langkah yang diambil, atau alasan jika ditolak." />
-                <span className="hint">Catatan ini terlihat oleh pelapor. Wajib diisi bila status Ditolak.</span>
+                <span className="hint">Catatan ini terlihat oleh pelapor saat melacak kode tiket. Wajib diisi bila status Ditolak.</span>
               </div>
               <button className="btn" type="submit" disabled={busy}>{busy ? "Menyimpan..." : "Simpan perubahan"}</button>
             </>

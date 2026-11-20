@@ -12,41 +12,51 @@ import {
 } from "@/lib/types";
 import ReportBrowser from "./ReportBrowser";
 import ReportMap from "./ReportMap";
+import SidebarShell, { type NavItem } from "./SidebarShell";
 import { Stars, api, formatDate } from "./ui";
 
-type Tab = "reports" | "map" | "stats" | "users" | "categories" | "audit";
+type Tab = "stats" | "reports" | "map" | "users" | "categories" | "audit";
 
-export default function AdminPanel({ currentUserId }: { currentUserId: number }) {
-  const [tab, setTab] = useState<Tab>("reports");
-  const tabs: [Tab, string][] = [
-    ["reports", "Laporan"],
-    ["map", "Peta"],
-    ["stats", "Statistik"],
-    ["users", "Pengguna"],
-    ["categories", "Kategori"],
-    ["audit", "Log audit"],
+const ICONS = {
+  chart: <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M7 15v-3M12 15V9M17 15v-5" /></svg>,
+  inbox: <svg viewBox="0 0 24 24"><path d="M4 4h16v11h-4l-2 3h-4l-2-3H4z" /></svg>,
+  map: <svg viewBox="0 0 24 24"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z" /></svg>,
+  users: <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3" /><path d="M3 19c0-3 2.7-5 6-5s6 2 6 5" /><circle cx="17" cy="9" r="2.5" /><path d="M17 14c2.5 0 4.5 1.5 4.5 4" /></svg>,
+  tag: <svg viewBox="0 0 24 24"><path d="M3 12V4h8l9 9-8 8z" /><circle cx="7.5" cy="7.5" r="1.2" /></svg>,
+  shield: <svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z" /></svg>,
+};
+
+export default function AdminPanel({ currentUserId, currentUserName }: { currentUserId: number; currentUserName: string }) {
+  const [tab, setTab] = useState<Tab>("stats");
+
+  const navItems: NavItem[] = [
+    { id: "stats", label: "Dashboard & Analitik", icon: ICONS.chart },
+    { id: "reports", label: "Semua Laporan", icon: ICONS.inbox },
+    { id: "map", label: "Peta Sebaran", icon: ICONS.map },
+    { id: "users", label: "Kelola Staf & Admin", icon: ICONS.users },
+    { id: "categories", label: "Kategori & SLA", icon: ICONS.tag },
+    { id: "audit", label: "Log Audit", icon: ICONS.shield },
   ];
 
   return (
-    <>
-      <div className="tabs" role="tablist">
-        {tabs.map(([key, label]) => (
-          <button key={key} className="tab" role="tab" aria-selected={tab === key} onClick={() => setTab(key)}>
-            {label}
-          </button>
-        ))}
-      </div>
+    <SidebarShell
+      title="Panel Administrator"
+      subtitle="Pantau kinerja layanan kelurahan, SLA petugas, analitik kategori, dan manajemen akun internal."
+      navItems={navItems}
+      activeId={tab}
+      onSelect={(id) => setTab(id as Tab)}
+      footerCaption="Transparansi & tata kelola cerdas"
+      user={{ name: currentUserName, roleLabel: "Administrator" }}
+    >
+      {tab === "stats" && <StatsView />}
       {tab === "reports" && <ReportBrowser role="admin" userId={currentUserId} />}
       {tab === "map" && <ReportMap role="admin" userId={currentUserId} />}
-      {tab === "stats" && <StatsView />}
       {tab === "users" && <UsersView currentUserId={currentUserId} />}
       {tab === "categories" && <CategoriesView />}
       {tab === "audit" && <AuditView />}
-    </>
+    </SidebarShell>
   );
 }
-
-/* ---------------- Statistik ---------------- */
 
 function StatsView() {
   const [stats, setStats] = useState<Stats | null>(null);
@@ -123,7 +133,7 @@ function StatsView() {
           <div className="l">Kepuasan warga{stats.ratingCount > 0 ? ` (${stats.ratingCount} penilaian)` : ""}</div>
         </div>
         <div className="stat"><div className="n">{avg}</div><div className="l">Rata-rata penyelesaian</div></div>
-        <div className="stat"><div className="n">{stats.totals.users}</div><div className="l">Pengguna</div></div>
+        <div className="stat"><div className="n">{stats.totals.users}</div><div className="l">Staf & Admin Aktif</div></div>
       </div>
 
       <div className="two-col">
@@ -190,8 +200,6 @@ function StatsView() {
   );
 }
 
-/* ---------------- Log audit ---------------- */
-
 interface AuditEntry {
   id: number;
   actor: string | null;
@@ -238,8 +246,6 @@ function AuditView() {
   );
 }
 
-/* ---------------- Pengguna ---------------- */
-
 function UsersView({ currentUserId }: { currentUserId: number }) {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [error, setError] = useState("");
@@ -279,7 +285,7 @@ function UsersView({ currentUserId }: { currentUserId: number }) {
     try {
       await api("/api/admin/users", { body: Object.fromEntries(new FormData(form).entries()) });
       form.reset();
-      setMsg("Akun berhasil dibuat.");
+      setMsg("Akun staf/admin berhasil dibuat.");
       await load();
     } catch (err) {
       setError((err as Error).message);
@@ -291,7 +297,7 @@ function UsersView({ currentUserId }: { currentUserId: number }) {
   return (
     <>
       <form onSubmit={create} className="card" style={{ marginBottom: 18 }} noValidate>
-        <h3>Tambah akun</h3>
+        <h3>Tambah Akun Petugas / Admin</h3>
         <div className="row">
           <div className="field"><label htmlFor="u-name">Nama</label><input id="u-name" name="name" type="text" required /></div>
           <div className="field"><label htmlFor="u-email">Email</label><input id="u-email" name="email" type="email" required /></div>
@@ -356,8 +362,6 @@ function UsersView({ currentUserId }: { currentUserId: number }) {
     </>
   );
 }
-
-/* ---------------- Kategori ---------------- */
 
 function CategoriesView() {
   const [cats, setCats] = useState<Category[]>([]);
@@ -439,9 +443,6 @@ function CategoriesView() {
             ))}
           </tbody>
         </table>
-        <p className="hint" style={{ marginTop: 10, fontSize: "0.82rem", color: "var(--muted)" }}>
-          Kategori tidak dihapus agar riwayat laporan tetap utuh; kategori nonaktif hanya disembunyikan dari form warga.
-        </p>
       </div>
     </>
   );

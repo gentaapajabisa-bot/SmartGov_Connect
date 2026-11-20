@@ -1,7 +1,8 @@
 // Tipe dan konstanta yang dipakai bersama oleh server dan klien.
 
-export const ROLES = ["warga", "petugas", "admin"] as const;
+export const ROLES = ["petugas", "admin"] as const;
 export type Role = (typeof ROLES)[number];
+export type ViewerRole = "warga" | Role;
 
 export const STATUSES = ["baru", "diverifikasi", "diproses", "selesai", "ditolak"] as const;
 export type Status = (typeof STATUSES)[number];
@@ -15,7 +16,6 @@ export const STATUS_LABEL: Record<Status, string> = {
 };
 
 export const ROLE_LABEL: Record<Role, string> = {
-  warga: "Warga",
   petugas: "Petugas Kelurahan",
   admin: "Admin",
 };
@@ -32,7 +32,6 @@ export interface Category {
   id: number;
   name: string;
   description: string | null;
-  /** Target waktu penyelesaian dalam jam. */
   sla_hours: number;
   is_active: boolean;
 }
@@ -44,24 +43,21 @@ export interface ReportSummary {
   status: Status;
   category_name: string;
   location_text: string;
-  /** null bila pelapor anonim (bagi petugas) atau bila pelihat adalah pelapor sendiri */
+  /** Selalu "Warga Anonim" karena laporan tidak menyimpan identitas pelapor. */
   reporter_name: string | null;
   is_anonymous: boolean;
-  /** Hanya diisi untuk petugas/admin; warga selalu null. */
   assigned_to: number | null;
   assigned_name: string | null;
   created_at: string;
-  /** Batas waktu penyelesaian menurut SLA kategori. */
   due_at: string;
-  /** true bila masih berjalan dan sudah melewati due_at. */
   overdue: boolean;
-  /** Jumlah dukungan warga. */
   votes: number;
+  rating_stars?: number | null;
+  first_photo_id?: number | null;
 }
 
 export interface PhotoRef {
   id: number;
-  /** report = foto pelapor; proof = bukti penyelesaian dari petugas. */
   kind: "report" | "proof";
 }
 
@@ -136,13 +132,10 @@ export interface AdminUser {
 export interface Stats {
   days: number;
   categoryId: number | null;
-  /** Rata-rata jam dari laporan masuk sampai pertama kali berstatus selesai; null bila belum ada. */
   avgResolveHours: number | null;
   unassigned: number;
   workload: { name: string; open: number; done: number; rating: number | null }[];
-  /** Laporan yang masih berjalan dan sudah melewati SLA (kondisi saat ini). */
   overdue: number;
-  /** Persentase laporan selesai yang tepat waktu menurut SLA; null bila belum ada. */
   slaMetPct: number | null;
   avgRating: number | null;
   ratingCount: number;

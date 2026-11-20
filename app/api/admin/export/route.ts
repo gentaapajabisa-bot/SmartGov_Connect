@@ -14,8 +14,6 @@ interface Row extends RowDataPacket {
   location_text: string;
   latitude: string | null;
   longitude: string | null;
-  reporter_name: string;
-  is_anonymous: number;
   assigned_name: string | null;
   officer_note: string | null;
   created_at: Date;
@@ -25,7 +23,6 @@ interface Row extends RowDataPacket {
   stars: number | null;
 }
 
-/** Escape CSV + cegah injeksi rumus spreadsheet (sel yang diawali = + - @ dianggap rumus oleh Excel). */
 function cell(value: unknown): string {
   let s = value === null || value === undefined ? "" : String(value);
   if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
@@ -34,7 +31,6 @@ function cell(value: unknown): string {
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-// Ekspor laporan ke CSV (khusus admin). Filter: status, category_id, from, to (YYYY-MM-DD).
 export async function GET(req: Request) {
   return run(async () => {
     await requireUser(["admin"]);
@@ -68,13 +64,12 @@ export async function GET(req: Request) {
 
     const rows = await query<Row>(
       `SELECT r.ticket_no, r.title, c.name AS category_name, r.status, r.location_text, r.latitude, r.longitude,
-              u.name AS reporter_name, r.is_anonymous, a.name AS assigned_name, r.officer_note, r.created_at, r.updated_at,
+              a.name AS assigned_name, r.officer_note, r.created_at, r.updated_at,
               DATE_ADD(r.created_at, INTERVAL c.sla_hours HOUR) AS due_at,
               (SELECT COUNT(*) FROM report_votes v WHERE v.report_id = r.id) AS votes,
               (SELECT stars FROM report_ratings rt WHERE rt.report_id = r.id) AS stars
          FROM reports r
          JOIN categories c ON c.id = r.category_id
-         JOIN users u ON u.id = r.user_id
          LEFT JOIN users a ON a.id = r.assigned_to
         ${where.length ? "WHERE " + where.join(" AND ") : ""}
         ORDER BY r.created_at DESC
@@ -82,7 +77,7 @@ export async function GET(req: Request) {
       params
     );
 
-    const header = ["Tiket", "Judul", "Kategori", "Status", "Lokasi", "Latitude", "Longitude", "Pelapor", "Anonim ke petugas", "Petugas", "Catatan terakhir", "Dibuat (UTC)", "Diperbarui (UTC)", "Batas SLA (UTC)", "Terlambat", "Dukungan", "Bintang"];
+    const header = ["Tiket", "Judul", "Kategori", "Status", "Lokasi", "Latitude", "Longitude", "Pelapor", "Petugas", "Catatan terakhir", "Dibuat (UTC)", "Diperbarui (UTC)", "Batas SLA (UTC)", "Terlambat", "Dukungan", "Bintang"];
     const lines = [header.map(cell).join(",")];
     for (const r of rows) {
       lines.push(
@@ -94,8 +89,7 @@ export async function GET(req: Request) {
           r.location_text,
           r.latitude,
           r.longitude,
-          r.reporter_name,
-          r.is_anonymous ? "Ya" : "Tidak",
+          "Warga Anonim",
           r.assigned_name,
           r.officer_note,
           new Date(r.created_at).toISOString(),
@@ -110,8 +104,7 @@ export async function GET(req: Request) {
       );
     }
 
-    // BOM agar Excel membaca UTF-8 dengan benar.
-    const body = "﻿" + lines.join("\r\n") + "\r\n";
+    const body = "\ufeff" + lines.join("\r\n") + "\r\n";
     const stamp = new Date().toISOString().slice(0, 10);
     return new Response(body, {
       headers: {

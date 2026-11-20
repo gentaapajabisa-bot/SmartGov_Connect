@@ -5,7 +5,7 @@ import Header from "@/components/Header";
 import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Masuk - SmartGov Connect" };
+export const metadata = { title: "Masuk Petugas / Admin - SmartGov Connect" };
 
 export default async function LoginPage() {
   const user = await getCurrentUser().catch(() => null);
@@ -14,7 +14,7 @@ export default async function LoginPage() {
   return (
     <>
       <Header />
-      <AuthShell heading="Masuk" blurb="Gunakan akun warga, petugas, atau admin.">
+      <AuthShell heading="Portal Petugas & Admin" blurb="Masuk menggunakan akun resmi kelurahan. Warga dapat langsung melapor tanpa login.">
         <AuthForm mode="login" />
       </AuthShell>
     </>
