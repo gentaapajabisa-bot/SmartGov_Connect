@@ -6,12 +6,13 @@ export async function GET(
   { params }: { params: { ticket: string } }
 ) {
   try {
+    const db = pool();
     const ticketCode = params.ticket?.trim().toUpperCase();
     if (!ticketCode || !/^SGC-\d{8}-[A-Z0-9]{6}$/.test(ticketCode)) {
       return NextResponse.json({ error: "Format nomor tiket tidak valid" }, { status: 400 });
     }
 
-    const [rows]: any = await pool.query(
+    const [rows]: any = await db.query(
       `SELECT 
         r.id, r.ticket_code, r.title, r.description, r.address, r.kecamatan, r.desa,
         r.status, r.created_at, r.updated_at,
@@ -31,7 +32,7 @@ export async function GET(
 
     const report = rows[0];
 
-    const [history] = await pool.query(
+    const [history] = await db.query(
       `SELECT status, note, created_at 
        FROM report_status_history 
        WHERE report_id = ? 

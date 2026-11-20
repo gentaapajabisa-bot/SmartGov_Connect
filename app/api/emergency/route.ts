@@ -4,7 +4,8 @@ import { DEFAULT_EMERGENCY_CONTACTS } from "@/lib/purbalingga";
 
 export async function GET() {
   try {
-    const [rows]: any = await pool.query(
+    const db = pool();
+    const [rows]: any = await db.query(
       `SELECT id, agency_name, category, phone_number, whatsapp_number, address, is_24_hours
        FROM emergency_contacts
        WHERE is_active = 1

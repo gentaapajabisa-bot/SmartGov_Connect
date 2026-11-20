@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import crypto from "crypto";
 import { pool } from "@/lib/db";
-import { getSessionUser } from "@/lib/auth";
+import * as authLib from "@/lib/auth";
 import { KECAMATAN_PURBALINGGA } from "@/lib/purbalingga";
 
 const createReportSchema = z.object({
@@ -22,8 +22,20 @@ function generateTicketCode(): string {
   return `SGC-${date}-${rand}`;
 }
 
+async function resolveAuthenticatedUser(req: NextRequest) {
+  const lib = authLib as Record<string, any>;
+  if (typeof lib.getCurrentUser === "function") return await lib.getCurrentUser(req);
+  if (typeof lib.getAuthUser === "function") return await lib.getAuthUser(req);
+  if (typeof lib.getSession === "function") return await lib.getSession(req);
+  if (typeof lib.verifySession === "function") return await lib.verifySession(req);
+  if (typeof lib.requireUser === "function") return await lib.requireUser(req);
+  return null;
+}
+
 export async function POST(req: NextRequest) {
   try {
+    const db = pool();
+
     // 1. Anti-spam berbasis hash harian (IP asli tidak pernah disimpan)
     const forwarded = req.headers.get("x-forwarded-for") || "unknown";
     const ip = forwarded.split(",")[0].trim();
@@ -33,7 +45,7 @@ export async function POST(req: NextRequest) {
       .update(`${ip}:${dailySalt}:create_report`)
       .digest("hex");
 
-    const [rateRows]: any = await pool.query(
+    const [rateRows]: any = await db.query(
       "SELECT hits, reset_at FROM rate_limits WHERE key_hash = ?",
       [keyHash]
     );
@@ -45,9 +57,9 @@ export async function POST(req: NextRequest) {
           { status: 429 }
         );
       }
-      await pool.query("UPDATE rate_limits SET hits = hits + 1 WHERE key_hash = ?", [keyHash]);
+      await db.query("UPDATE rate_limits SET hits = hits + 1 WHERE key_hash = ?", [keyHash]);
     } else {
-      await pool.query(
+      await db.query(
         "REPLACE INTO rate_limits (key_hash, action, hits, reset_at) VALUES (?, 'create_report', 1, DATE_ADD(NOW(), INTERVAL 1 HOUR))",
         [keyHash]
       );
@@ -76,7 +88,7 @@ export async function POST(req: NextRequest) {
     const data = parsed.data;
 
     // 3. Ambil agency_id (OPD penanggung jawab) dari kategori
-    const [catRows]: any = await pool.query(
+    const [catRows]: any = await db.query(
       "SELECT agency_id FROM categories WHERE id = ? LIMIT 1",
       [data.category_id]
     );
@@ -89,7 +101,7 @@ export async function POST(req: NextRequest) {
     const ticketCode = generateTicketCode();
 
     // 4. Simpan laporan anonim (user_id = NULL, is_anonymous = 1)
-    const [insertResult]: any = await pool.query(
+    const [insertResult]: any = await db.query(
       `INSERT INTO reports 
         (ticket_code, user_id, category_id, agency_id, title, description, address, kecamatan, desa, latitude, longitude, status, is_anonymous)
        VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 1)`,
@@ -119,7 +131,7 @@ export async function POST(req: NextRequest) {
           continue;
         }
         const buffer = Buffer.from(await photo.arrayBuffer());
-        await pool.query(
+        await db.query(
           "INSERT INTO report_photos (report_id, mime_type, data, kind) VALUES (?, ?, ?, 'evidence')",
           [reportId, photo.type, buffer]
         );
@@ -127,7 +139,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 6. Catat riwayat status awal
-    await pool.query(
+    await db.query(
       "INSERT INTO report_status_history (report_id, status, note) VALUES (?, 'pending', 'Laporan diterima sistem secara anonim dan diteruskan ke dinas terkait.')",
       [reportId]
     );
@@ -147,11 +159,24 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
-    const user = await getSessionUser();
-    if (!user || (user.role !== "admin" && user.role !== "officer")) {
+    const db = pool();
+    const sessionUser = await resolveAuthenticatedUser(req);
+
+    if (!sessionUser || (sessionUser.role !== "admin" && sessionUser.role !== "officer")) {
       return NextResponse.json({ error: "Tidak memiliki akses" }, { status: 401 });
     }
 
+    // Ambil agency_id terbaru langsung dari database users
+    const [userRows]: any = await db.query(
+      "SELECT role, agency_id FROM users WHERE id = ? LIMIT 1",
+      [sessionUser.id]
+    );
+
+    if (userRows.length === 0) {
+      return NextResponse.json({ error: "Pengguna tidak ditemukan" }, { status: 401 });
+    }
+
+    const dbUser = userRows[0];
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
     const kecamatan = searchParams.get("kecamatan");
@@ -169,12 +194,12 @@ export async function GET(req: NextRequest) {
     `;
     const params: any[] = [];
 
-    if (user.role === "officer") {
-      if (!(user as any).agency_id) {
+    if (dbUser.role === "officer") {
+      if (!dbUser.agency_id) {
         return NextResponse.json({ reports: [] });
       }
       sql += " AND r.agency_id = ?";
-      params.push((user as any).agency_id);
+      params.push(dbUser.agency_id);
     }
 
     if (status) {
@@ -189,7 +214,7 @@ export async function GET(req: NextRequest) {
 
     sql += " ORDER BY r.created_at DESC LIMIT 200";
 
-    const [rows] = await pool.query(sql, params);
+    const [rows] = await db.query(sql, params);
     return NextResponse.json({ reports: rows });
   } catch (err) {
     console.error("GET /api/reports error:", err);
