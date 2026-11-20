@@ -26,7 +26,7 @@ export default function ReportBrowser({
   const [error, setError] = useState("");
   const [selected, setSelected] = useState<number | null>(null);
   const [tick, setTick] = useState(0);
-  const isStaff = role !== "warga";
+  const isStaff = role === "petugas" || role === "admin";
 
   useEffect(() => {
     api<{ categories: Category[] }>("/api/categories")
@@ -110,7 +110,7 @@ export default function ReportBrowser({
           {loading && items.length === 0 && <div className="empty">Memuat laporan...</div>}
           {!loading && items.length === 0 && !error && (
             <div className="empty">
-              {role === "warga" ? "Belum ada laporan. Buat pengaduan pertama Anda." : "Belum ada laporan yang cocok."}
+             role: "warga" | "petugas" | "admin";
             </div>
           )}
           {items.map((r) => (
