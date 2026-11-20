@@ -1,149 +1,198 @@
-import { randomBytes, randomInt } from "node:crypto";
-import type { ResultSetHeader, RowDataPacket } from "mysql2";
-import { getCurrentUser } from "@/lib/auth";
-import { isDuplicate, query, withTransaction } from "@/lib/db";
-import { HttpError, ok, readJson, run } from "@/lib/http";
-import { clientIp, rateLimit } from "@/lib/ratelimit";
-import { REPORT_JOINS, REPORT_SELECT, hashDeviceToken, toSummary, type ReportRow } from "@/lib/reports";
-import { STATUSES, type Status } from "@/lib/types";
-import { reportCreateSchema } from "@/lib/validation";
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import crypto from "crypto";
+import { pool } from "@/lib/db";
+import { getSessionUser } from "@/lib/auth";
+import { KECAMATAN_PURBALINGGA } from "@/lib/purbalingga";
 
-export const dynamic = "force-dynamic";
+const createReportSchema = z.object({
+  category_id: z.coerce.number().int().positive(),
+  title: z.string().min(5, "Judul laporan minimal 5 karakter").max(150),
+  description: z.string().min(10, "Uraian kejadian minimal 10 karakter").max(2000),
+  kecamatan: z.enum(KECAMATAN_PURBALINGGA),
+  desa: z.string().min(2, "Nama desa/kelurahan wajib diisi").max(100),
+  address: z.string().min(5, "Patokan lokasi minimal 5 karakter").max(255),
+  latitude: z.coerce.number().min(-90).max(90).nullable().optional(),
+  longitude: z.coerce.number().min(-180).max(180).nullable().optional(),
+});
 
-const TICKET_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
-function newTicketNo(): string {
+function generateTicketCode(): string {
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  let suffix = "";
-  for (let i = 0; i < 6; i++) suffix += TICKET_ALPHABET[randomInt(TICKET_ALPHABET.length)];
-  return `SGC-${date}-${suffix}`;
+  const rand = crypto.randomBytes(3).toString("hex").toUpperCase();
+  return `SGC-${date}-${rand}`;
 }
 
-// Daftar laporan:
-// - Petugas/Admin melihat semua laporan dengan filter lengkap.
-// - Warga tanpa login dapat mengambil daftar laporan miliknya lewat query ?tickets=SGC-...,SGC-...
-//   atau melihat ringkasan publik terbaru (?public=1).
-export async function GET(req: Request) {
-  return run(async () => {
-    const user = await getCurrentUser();
-    const url = new URL(req.url);
-    const status = url.searchParams.get("status") ?? "";
-    const q = (url.searchParams.get("q") ?? "").trim().slice(0, 100);
-    const categoryId = Number(url.searchParams.get("category_id") ?? "");
-    const assigned = url.searchParams.get("assigned") ?? "";
-    const onlyOverdue = url.searchParams.get("overdue") === "1";
-    const sort = url.searchParams.get("sort") ?? "";
-    const ticketsParam = url.searchParams.get("tickets") ?? "";
-    const isPublicFeed = url.searchParams.get("public") === "1";
+export async function POST(req: NextRequest) {
+  try {
+    // 1. Anti-spam berbasis hash harian (IP asli tidak pernah disimpan)
+    const forwarded = req.headers.get("x-forwarded-for") || "unknown";
+    const ip = forwarded.split(",")[0].trim();
+    const dailySalt = new Date().toISOString().slice(0, 10);
+    const keyHash = crypto
+      .createHash("sha256")
+      .update(`${ip}:${dailySalt}:create_report`)
+      .digest("hex");
 
-    const where: string[] = [];
-    const params: unknown[] = [];
+    const [rateRows]: any = await pool.query(
+      "SELECT hits, reset_at FROM rate_limits WHERE key_hash = ?",
+      [keyHash]
+    );
 
-    if (!user) {
-      if (ticketsParam) {
-        const list = ticketsParam
-          .split(",")
-          .map((t) => t.trim().toUpperCase())
-          .filter(Boolean)
-          .slice(0, 50);
-        if (list.length === 0) return ok({ reports: [] });
-        where.push(`r.ticket_no IN (${list.map(() => "?").join(",")})`);
-        params.push(...list);
-      } else if (isPublicFeed) {
-        // Feed publik hanya menampilkan laporan valid (bukan ditolak)
-        where.push("r.status <> 'ditolak'");
-      } else {
-        return ok({ reports: [] });
+    if (rateRows.length > 0 && new Date(rateRows[0].reset_at) > new Date()) {
+      if (rateRows[0].hits >= 5) {
+        return NextResponse.json(
+          { error: "Terlalu banyak pengiriman laporan. Silakan coba lagi nanti." },
+          { status: 429 }
+        );
       }
+      await pool.query("UPDATE rate_limits SET hits = hits + 1 WHERE key_hash = ?", [keyHash]);
+    } else {
+      await pool.query(
+        "REPLACE INTO rate_limits (key_hash, action, hits, reset_at) VALUES (?, 'create_report', 1, DATE_ADD(NOW(), INTERVAL 1 HOUR))",
+        [keyHash]
+      );
+    }
+
+    // 2. Baca FormData
+    const formData = await req.formData();
+    const parsed = createReportSchema.safeParse({
+      category_id: formData.get("category_id"),
+      title: formData.get("title"),
+      description: formData.get("description"),
+      kecamatan: formData.get("kecamatan"),
+      desa: formData.get("desa"),
+      address: formData.get("address"),
+      latitude: formData.get("latitude") || null,
+      longitude: formData.get("longitude") || null,
+    });
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Data laporan tidak valid", details: parsed.error.flatten() },
+        { status: 400 }
+      );
+    }
+
+    const data = parsed.data;
+
+    // 3. Ambil agency_id (OPD penanggung jawab) dari kategori
+    const [catRows]: any = await pool.query(
+      "SELECT agency_id FROM categories WHERE id = ? LIMIT 1",
+      [data.category_id]
+    );
+
+    if (catRows.length === 0) {
+      return NextResponse.json({ error: "Kategori tidak ditemukan" }, { status: 404 });
+    }
+
+    const agencyId = catRows[0].agency_id;
+    const ticketCode = generateTicketCode();
+
+    // 4. Simpan laporan anonim (user_id = NULL, is_anonymous = 1)
+    const [insertResult]: any = await pool.query(
+      `INSERT INTO reports 
+        (ticket_code, user_id, category_id, agency_id, title, description, address, kecamatan, desa, latitude, longitude, status, is_anonymous)
+       VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 1)`,
+      [
+        ticketCode,
+        data.category_id,
+        agencyId,
+        data.title,
+        data.description,
+        data.address,
+        data.kecamatan,
+        data.desa,
+        data.latitude ?? null,
+        data.longitude ?? null,
+      ]
+    );
+
+    const reportId = insertResult.insertId;
+
+    // 5. Simpan foto bukti (maksimal 3 foto, maks 5MB per foto)
+    const photos = formData.getAll("photos") as File[];
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+
+    for (const photo of photos.slice(0, 3)) {
+      if (photo && photo.size > 0) {
+        if (!allowedTypes.includes(photo.type) || photo.size > 5 * 1024 * 1024) {
+          continue;
+        }
+        const buffer = Buffer.from(await photo.arrayBuffer());
+        await pool.query(
+          "INSERT INTO report_photos (report_id, mime_type, data, kind) VALUES (?, ?, ?, 'evidence')",
+          [reportId, photo.type, buffer]
+        );
+      }
+    }
+
+    // 6. Catat riwayat status awal
+    await pool.query(
+      "INSERT INTO report_status_history (report_id, status, note) VALUES (?, 'pending', 'Laporan diterima sistem secara anonim dan diteruskan ke dinas terkait.')",
+      [reportId]
+    );
+
+    return NextResponse.json(
+      {
+        message: "Laporan berhasil dikirim secara anonim",
+        ticket_code: ticketCode,
+      },
+      { status: 201 }
+    );
+  } catch (err) {
+    console.error("POST /api/reports error:", err);
+    return NextResponse.json({ error: "Terjadi kesalahan pada server" }, { status: 500 });
+  }
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const user = await getSessionUser();
+    if (!user || (user.role !== "admin" && user.role !== "officer")) {
+      return NextResponse.json({ error: "Tidak memiliki akses" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const status = searchParams.get("status");
+    const kecamatan = searchParams.get("kecamatan");
+
+    let sql = `
+      SELECT 
+        r.id, r.ticket_code, r.title, r.description, r.address, r.kecamatan, r.desa,
+        r.latitude, r.longitude, r.status, r.is_anonymous, r.created_at, r.updated_at,
+        c.name AS category_name, c.sla_hours,
+        a.short_name AS agency_name, a.code AS agency_code
+      FROM reports r
+      LEFT JOIN categories c ON r.category_id = c.id
+      LEFT JOIN agencies a ON r.agency_id = a.id
+      WHERE 1=1
+    `;
+    const params: any[] = [];
+
+    if (user.role === "officer") {
+      if (!(user as any).agency_id) {
+        return NextResponse.json({ reports: [] });
+      }
+      sql += " AND r.agency_id = ?";
+      params.push((user as any).agency_id);
     }
 
     if (status) {
-      if (!(STATUSES as readonly string[]).includes(status)) throw new HttpError(400, "Status tidak valid.");
-      where.push("r.status = ?");
-      params.push(status as Status);
-    }
-    if (Number.isInteger(categoryId) && categoryId > 0) {
-      where.push("r.category_id = ?");
-      params.push(categoryId);
-    }
-    if (user) {
-      if (assigned === "me") {
-        where.push("r.assigned_to = ?");
-        params.push(user.id);
-      } else if (assigned === "none") {
-        where.push("r.assigned_to IS NULL");
-      }
-      if (onlyOverdue) {
-        where.push("r.status IN ('baru','diverifikasi','diproses') AND DATE_ADD(r.created_at, INTERVAL c.sla_hours HOUR) < UTC_TIMESTAMP()");
-      }
-    }
-    if (q) {
-      const like = `%${q.replace(/[\%_]/g, "\\$&")}%`;
-      where.push("(r.ticket_no LIKE ? OR r.title LIKE ?)");
-      params.push(like, like);
+      sql += " AND r.status = ?";
+      params.push(status);
     }
 
-    const limit = !user && isPublicFeed ? 10 : 100;
-    const rows = await query<ReportRow>(
-      `SELECT ${REPORT_SELECT}
-         ${REPORT_JOINS}
-        ${where.length ? "WHERE " + where.join(" AND ") : ""}
-        ORDER BY ${sort === "votes" ? "votes DESC, r.created_at DESC" : sort === "due" ? "due_at ASC" : "r.created_at DESC"}
-        LIMIT ${limit}`,
-      params
-    );
-
-    const viewerRole = user ? user.role : "warga";
-    return ok({ reports: rows.map((r) => toSummary(viewerRole, r)) });
-  });
-}
-
-// Membuat pengaduan baru secara anonim tanpa login.
-// Mengembalikan id, ticket_no, dan device_token (disimpan di localStorage browser warga).
-export async function POST(req: Request) {
-  return run(async () => {
-    await rateLimit(`report:ip:${clientIp(req)}`, 15, 60 * 60);
-    const data = reportCreateSchema.parse(await readJson(req));
-
-    const cat = await query<RowDataPacket>("SELECT id FROM categories WHERE id = ? AND is_active = 1", [
-      data.category_id,
-    ]);
-    if (!cat[0]) throw new HttpError(400, "Kategori tidak ditemukan atau sudah tidak aktif.");
-
-    const rawDeviceToken = randomBytes(24).toString("hex");
-    const tokenHash = hashDeviceToken(rawDeviceToken);
-
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const ticketNo = newTicketNo();
-      try {
-        const reportId = await withTransaction(async (conn) => {
-          const [res] = await conn.query<ResultSetHeader>(
-            `INSERT INTO reports
-               (ticket_no, device_token_hash, user_id, category_id, title, description, location_text, latitude, longitude, is_anonymous, status)
-             VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, 1, 'baru')`,
-            [
-              ticketNo,
-              tokenHash,
-              data.category_id,
-              data.title,
-              data.description,
-              data.location_text,
-              data.latitude ?? null,
-              data.longitude ?? null,
-            ]
-          );
-          await conn.query(
-            "INSERT INTO report_status_history (report_id, status, note, changed_by) VALUES (?, 'baru', ?, NULL)",
-            [res.insertId, "Laporan anonim diterima sistem."]
-          );
-          return res.insertId;
-        });
-        return ok({ id: reportId, ticket_no: ticketNo, device_token: rawDeviceToken }, 201);
-      } catch (err) {
-        if (isDuplicate(err)) continue;
-        throw err;
-      }
+    if (kecamatan) {
+      sql += " AND r.kecamatan = ?";
+      params.push(kecamatan);
     }
-    throw new HttpError(500, "Gagal membuat nomor tiket. Silakan coba lagi.");
-  });
+
+    sql += " ORDER BY r.created_at DESC LIMIT 200";
+
+    const [rows] = await pool.query(sql, params);
+    return NextResponse.json({ reports: rows });
+  } catch (err) {
+    console.error("GET /api/reports error:", err);
+    return NextResponse.json({ error: "Gagal memuat daftar laporan" }, { status: 500 });
+  }
 }
