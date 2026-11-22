@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   ROLES,
   ROLE_LABEL,
@@ -26,25 +26,25 @@ interface AgencyItem {
 
 interface ExtendedAdminUser extends AdminUser {
   agency_id?: number | null;
-  agency_name?: string | null;
 }
 
-const FALLBACK_AGENCIES: AgencyItem[] = [
-  { id: 1, code: "DISKOMINFO", name: "Dinas Komunikasi dan Informatika Kab. Purbalingga", short_name: "Diskominfo Purbalingga" },
-  { id: 2, code: "DPUPR", name: "Dinas Pekerjaan Umum dan Penataan Ruang Kab. Purbalingga", short_name: "DPUPR Purbalingga" },
-  { id: 3, code: "SATPOLPP", name: "Satuan Polisi Pamong Praja Kab. Purbalingga", short_name: "Satpol PP Purbalingga" },
-  { id: 4, code: "DINHUB", name: "Dinas Perhubungan Kab. Purbalingga", short_name: "Dinhub Purbalingga" },
-  { id: 5, code: "DLH", name: "Dinas Lingkungan Hidup Kab. Purbalingga", short_name: "DLH Purbalingga" },
-  { id: 6, code: "BPBD", name: "Badan Penanggulangan Bencana Daerah Kab. Purbalingga", short_name: "BPBD Purbalingga" },
-  { id: 7, code: "DAMKAR", name: "Pemadam Kebakaran & Penyelamatan Kab. Purbalingga", short_name: "Damkar Purbalingga" },
+const PURBALINGGA_AGENCIES: AgencyItem[] = [
+  { id: 1, code: "DISKOMINFO", name: "Dinas Komunikasi dan Informatika Kabupaten Purbalingga", short_name: "Diskominfo Purbalingga" },
+  { id: 2, code: "DPUPR", name: "Dinas Pekerjaan Umum dan Penataan Ruang Kabupaten Purbalingga", short_name: "DPUPR Purbalingga" },
+  { id: 3, code: "SATPOLPP", name: "Satuan Polisi Pamong Praja Kabupaten Purbalingga", short_name: "Satpol PP Purbalingga" },
+  { id: 4, code: "DINHUB", name: "Dinas Perhubungan Kabupaten Purbalingga", short_name: "Dinhub Purbalingga" },
+  { id: 5, code: "DLH", name: "Dinas Lingkungan Hidup Kabupaten Purbalingga", short_name: "DLH Purbalingga" },
+  { id: 6, code: "BPBD", name: "Badan Penanggulangan Bencana Daerah Kabupaten Purbalingga", short_name: "BPBD Purbalingga" },
+  { id: 7, code: "DAMKAR", name: "Pemadam Kebakaran dan Penyelamatan Kabupaten Purbalingga", short_name: "Damkar Purbalingga" },
   { id: 8, code: "POLRES", name: "Kepolisian Resor (Polres) Purbalingga", short_name: "Polres Purbalingga" },
-  { id: 9, code: "RSUD", name: "RSUD dr. R. Goeteng Taroenadibrata Purbalingga", short_name: "RSUD Goeteng Purbalingga" },
+  { id: 9, code: "RSUD", name: "RSUD dr. R. Goeteng Taroenadibrata Kabupaten Purbalingga", short_name: "RSUD Goeteng Purbalingga" },
+  { id: 10, code: "KECAMATAN", name: "Koordinator Wilayah Kecamatan se-Kabupaten Purbalingga", short_name: "Kecamatan Purbalingga" },
 ];
 
-const CUSTOM_ROLE_OPTIONS: { value: string; label: string }[] = [
+const ROLE_OPTIONS: { value: string; label: string }[] = [
   { value: "petugas", label: "Petugas Lapangan OPD" },
   { value: "koordinator_opd", label: "Koordinator / Kepala Bidang OPD" },
-  { value: "operator_kecamatan", label: "Operator Kecamatan / Kelurahan" },
+  { value: "operator_kecamatan", label: "Operator Wilayah Kecamatan" },
   { value: "call_center_112", label: "Operator Siaga Darurat 112" },
   { value: "admin", label: "Super Admin Kabupaten (Diskominfo)" },
 ];
@@ -58,7 +58,13 @@ const ICONS = {
   shield: <svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z" /></svg>,
 };
 
-export default function AdminPanel({ currentUserId, currentUserName }: { currentUserId: number; currentUserName: string }) {
+export default function AdminPanel({
+  currentUserId,
+  currentUserName,
+}: {
+  currentUserId: number;
+  currentUserName: string;
+}) {
   const [tab, setTab] = useState<Tab>("stats");
 
   const navItems: NavItem[] = [
@@ -73,12 +79,12 @@ export default function AdminPanel({ currentUserId, currentUserName }: { current
   return (
     <SidebarShell
       title="Panel Administrator Kabupaten Purbalingga"
-      subtitle="Pantau kinerja layanan OPD, SLA petugas, analitik kategori, dan manajemen akun instansi."
+      subtitle="Pusat kendali layanan aspirasi masyarakat, SLA lintas OPD, analitik wilayah, dan manajemen akun instansi."
       navItems={navItems}
       activeId={tab}
       onSelect={(id) => setTab(id as Tab)}
-      footerCaption="Transparansi & tata kelola cerdas"
-      user={{ name: currentUserName, roleLabel: "Administrator" }}
+      footerCaption="SmartGov Connect · Kabupaten Purbalingga"
+      user={{ name: currentUserName, roleLabel: "Administrator Kabupaten" }}
     >
       {tab === "stats" && <StatsView />}
       {tab === "reports" && <ReportBrowser role="admin" userId={currentUserId} />}
@@ -135,7 +141,7 @@ function StatsView() {
   );
 
   if (error) return <>{filters}<div className="alert alert-error">{error}</div></>;
-  if (!stats) return <>{filters}<div className="empty">Memuat statistik...</div></>;
+  if (!stats) return <>{filters}<div className="empty">Memuat statistik Kabupaten Purbalingga...</div></>;
 
   const count = (s: string) => stats.byStatus.find((x) => x.status === s)?.n ?? 0;
   const maxCat = Math.max(1, ...stats.byCategory.map((c) => c.n));
@@ -151,6 +157,14 @@ function StatsView() {
 
   return (
     <>
+      <div className="sgc-admin-banner">
+        <div>
+          <p className="sgc-admin-banner-title">Ringkasan Kinerja Layanan Publik Kabupaten Purbalingga</p>
+          <p className="sgc-admin-banner-sub">Monitoring terpadu lintas OPD (DPUPR, Satpol PP, Dinhub, DLH, BPBD, Damkar, Polres, RSUD Goeteng).</p>
+        </div>
+        <span className="sgc-agency-pill">Kabupaten Purbalingga</span>
+      </div>
+
       {filters}
       <div className="stat-grid">
         <div className="stat"><div className="n">{stats.totals.reports}</div><div className="l">Total laporan</div></div>
@@ -165,7 +179,7 @@ function StatsView() {
           <div className="l">Kepuasan warga{stats.ratingCount > 0 ? ` (${stats.ratingCount} penilaian)` : ""}</div>
         </div>
         <div className="stat"><div className="n">{avg}</div><div className="l">Rata-rata penyelesaian</div></div>
-        <div className="stat"><div className="n">{stats.totals.users}</div><div className="l">Staf &amp; Admin Aktif</div></div>
+        <div className="stat"><div className="n">{stats.totals.users}</div><div className="l">Staf &amp; Admin OPD</div></div>
       </div>
 
       <div className="two-col">
@@ -213,7 +227,7 @@ function StatsView() {
       </div>
 
       <div className="card" style={{ marginTop: 18 }}>
-        <h3>Beban kerja petugas</h3>
+        <h3>Beban kerja petugas OPD</h3>
         {stats.workload.length === 0 ? (
           <div className="empty">Belum ada laporan yang ditugaskan.</div>
         ) : (
@@ -280,8 +294,9 @@ function AuditView() {
 
 function UsersView({ currentUserId }: { currentUserId: number }) {
   const [users, setUsers] = useState<ExtendedAdminUser[]>([]);
-  const [agencies, setAgencies] = useState<AgencyItem[]>(FALLBACK_AGENCIES);
+  const [agencies, setAgencies] = useState<AgencyItem[]>(PURBALINGGA_AGENCIES);
   const [filterAgency, setFilterAgency] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
@@ -290,7 +305,7 @@ function UsersView({ currentUserId }: { currentUserId: number }) {
     try {
       const [uRes, aRes] = await Promise.all([
         api<{ users: ExtendedAdminUser[] }>("/api/admin/users"),
-        api<{ agencies: AgencyItem[] }>("/api/agencies").catch(() => ({ agencies: FALLBACK_AGENCIES })),
+        api<{ agencies: AgencyItem[] }>("/api/agencies").catch(() => ({ agencies: PURBALINGGA_AGENCIES })),
       ]);
       setUsers(uRes.users);
       if (aRes.agencies && aRes.agencies.length > 0) {
@@ -310,7 +325,7 @@ function UsersView({ currentUserId }: { currentUserId: number }) {
     setMsg("");
     try {
       await api(`/api/admin/users/${id}`, { method: "PATCH", body });
-      setMsg("Perubahan akun instansi berhasil disimpan.");
+      setMsg("Data akun petugas instansi berhasil diperbarui.");
       await load();
     } catch (e) {
       setError((e as Error).message);
@@ -325,15 +340,16 @@ function UsersView({ currentUserId }: { currentUserId: number }) {
     const form = e.currentTarget;
     const raw = Object.fromEntries(new FormData(form).entries());
     const payload = {
-      ...raw,
+      name: String(raw.name ?? "").trim(),
+      email: String(raw.email ?? "").trim(),
+      password: String(raw.password ?? ""),
       role: raw.role === "admin" ? "admin" : "petugas",
-      position_label: raw.role,
       agency_id: raw.agency_id ? Number(raw.agency_id) : null,
     };
     try {
       await api("/api/admin/users", { body: payload });
       form.reset();
-      setMsg("Akun petugas / admin instansi berhasil dibuat.");
+      setMsg("Akun petugas / admin OPD Kabupaten Purbalingga berhasil dibuat.");
       await load();
     } catch (err) {
       setError((err as Error).message);
@@ -342,50 +358,63 @@ function UsersView({ currentUserId }: { currentUserId: number }) {
     }
   }
 
-  const filteredUsers = filterAgency
-    ? users.filter((u) => String(u.agency_id ?? "") === filterAgency)
-    : users;
+  const filteredUsers = useMemo(() => {
+    return users.filter((u) => {
+      const matchAgency = !filterAgency || String(u.agency_id ?? "") === filterAgency;
+      const q = searchQuery.trim().toLowerCase();
+      const matchText =
+        !q ||
+        u.name.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q);
+      return matchAgency && matchText;
+    });
+  }, [users, filterAgency, searchQuery]);
 
   return (
     <>
       <form onSubmit={create} className="card" style={{ marginBottom: 18 }} noValidate>
-        <h3>Tambah Akun Petugas / Admin Instansi</h3>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+          <h3 style={{ margin: 0 }}>Tambah Akun Petugas / Admin Instansi</h3>
+          <span className="sgc-agency-pill">Pemerintah Kabupaten Purbalingga</span>
+        </div>
+
         <div className="row">
           <div className="field">
-            <label htmlFor="u-name">Nama Petugas / Unit</label>
-            <input id="u-name" name="name" type="text" placeholder="Contoh: Tim Reaksi Cepat DPUPR" required />
+            <label htmlFor="u-name">Nama Petugas / Unit Kerja</label>
+            <input id="u-name" name="name" type="text" placeholder="Contoh: Petugas Lapangan DPUPR" required />
           </div>
           <div className="field">
             <label htmlFor="u-email">Email Resmi Instansi</label>
-            <input id="u-email" name="email" type="email" placeholder="Contoh: bidangjalan@purbalinggakab.go.id" required />
+            <input id="u-email" name="email" type="email" placeholder="Contoh: dpupr@purbalinggakab.go.id" required />
           </div>
         </div>
-        <div className="row">
+
+        <div className="sgc-form-grid-3">
           <div className="field">
             <label htmlFor="u-agency">Instansi / OPD Kabupaten Purbalingga</label>
             <select id="u-agency" name="agency_id" defaultValue="">
-              <option value="">-- Pilih OPD / Instansi Terkait --</option>
+              <option value="">-- Pilih Instansi / OPD --</option>
               {agencies.map((ag) => (
                 <option key={ag.id} value={ag.id}>
                   {ag.short_name} ({ag.code})
                 </option>
               ))}
             </select>
-            <span className="hint">Menentukan laporan mana saja yang masuk ke dashboard petugas ini.</span>
           </div>
           <div className="field">
             <label htmlFor="u-role">Peran / Jabatan Akses</label>
             <select id="u-role" name="role" defaultValue="petugas">
-              {CUSTOM_ROLE_OPTIONS.map((opt) => (
+              {ROLE_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
           </div>
+          <div className="field">
+            <label htmlFor="u-pass">Kata sandi awal</label>
+            <input id="u-pass" name="password" type="password" autoComplete="new-password" placeholder="Min. 8 karakter (huruf & angka)" required />
+          </div>
         </div>
-        <div className="field">
-          <label htmlFor="u-pass">Kata sandi awal</label>
-          <input id="u-pass" name="password" type="password" autoComplete="new-password" placeholder="Minimal 8 karakter (huruf & angka)" required />
-        </div>
+
         <button className="btn" disabled={busy}>{busy ? "Menyimpan..." : "Buat akun instansi"}</button>
       </form>
 
@@ -393,8 +422,15 @@ function UsersView({ currentUserId }: { currentUserId: number }) {
       {msg && <div className="alert alert-ok" role="status">{msg}</div>}
 
       <div className="card table-wrap">
-        <div className="toolbar" style={{ justifyContent: "space-between", alignItems: "center" }}>
-          <h3 style={{ margin: 0 }}>Daftar Akun Staf &amp; Admin ({filteredUsers.length})</h3>
+        <div className="toolbar" style={{ alignItems: "center" }}>
+          <h3 style={{ margin: 0, marginRight: "auto" }}>Daftar Akun Staf &amp; Admin ({filteredUsers.length})</h3>
+          <input
+            type="text"
+            placeholder="Cari nama atau email..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            aria-label="Cari staf"
+          />
           <select
             value={filterAgency}
             onChange={(e) => setFilterAgency(e.target.value)}
@@ -409,14 +445,21 @@ function UsersView({ currentUserId }: { currentUserId: number }) {
 
         <table>
           <thead>
-            <tr><th>Nama</th><th>Email</th><th>Instansi / OPD</th><th>Peran</th><th>Terdaftar</th><th>Status</th></tr>
+            <tr>
+              <th>Nama</th>
+              <th>Email</th>
+              <th>Instansi / OPD</th>
+              <th>Peran</th>
+              <th>Terdaftar</th>
+              <th>Status</th>
+            </tr>
           </thead>
           <tbody>
             {filteredUsers.map((u) => {
               const self = u.id === currentUserId;
               return (
                 <tr key={u.id} className={u.is_active ? "" : "inactive"}>
-                  <td>{u.name}{self && " (Anda)"}</td>
+                  <td><strong>{u.name}</strong>{self && <span className="muted"> (Anda)</span>}</td>
                   <td>{u.email}</td>
                   <td>
                     <select
@@ -426,7 +469,7 @@ function UsersView({ currentUserId }: { currentUserId: number }) {
                       }
                       aria-label={`Instansi ${u.name}`}
                     >
-                      <option value="">-- Lintas Dinas --</option>
+                      <option value="">-- Lintas OPD --</option>
                       {agencies.map((ag) => (
                         <option key={ag.id} value={ag.id}>{ag.short_name}</option>
                       ))}
@@ -513,7 +556,7 @@ function CategoriesView() {
   return (
     <>
       <form onSubmit={create} className="card" style={{ marginBottom: 18 }} noValidate>
-        <h3>Tambah kategori</h3>
+        <h3>Tambah kategori aduan</h3>
         <div className="row">
           <div className="field"><label htmlFor="c-name">Nama</label><input id="c-name" name="name" type="text" required /></div>
           <div className="field"><label htmlFor="c-desc">Deskripsi (opsional)</label><input id="c-desc" name="description" type="text" /></div>

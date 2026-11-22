@@ -405,19 +405,20 @@ td select { width: auto; padding: 6px 8px; }
 .nearby-title { font-weight: 600; }
 
 /* =====================================================================
-   Tema terang (html[data-theme="light"]):
-   Latar belakang & animasi kota 3D TETAP SAMA seperti mode gelap,
-   sementara panel/kartu beralih ke kaca terang (frosted light glass).
+   Tema Terang (html[data-theme="light"]):
+   Latar belakang malam Smart City & animasi kanvas kota 3D (.city-bg)
+   TETAP DIPERTAHANKAN dan identik di mode terang maupun mode gelap.
+   Hanya panel, kartu, dan form yang beradaptasi menjadi frosted glass terang.
    ===================================================================== */
 html[data-theme="light"] {
   --bg: #050b18;
   --bg2: #0a1428;
-  --panel: rgba(248, 250, 252, 0.90);
+  --panel: rgba(255, 255, 255, 0.92);
   --panel-solid: #ffffff;
   --line: rgba(15, 76, 129, 0.22);
   --line-strong: rgba(3, 105, 161, 0.45);
-  --text: #0b1730;
-  --ink: #0b1730;
+  --text: #0f172a;
+  --ink: #0f172a;
   --muted: #475569;
   --cyan: #0284c7;
   --blue: #2563eb;
@@ -427,50 +428,61 @@ html[data-theme="light"] {
   --ok: #059669;
   color-scheme: light;
 }
-/* Pastikan latar & animasi kota 3D selalu aktif dan sama di mode terang maupun gelap */
+
+/* Kunci latar belakang dan animasi kota 3D agar selalu aktif & tidak berubah */
+html[data-theme="light"] body::before {
+  background:
+    radial-gradient(1200px 620px at 85% -10%, rgba(59, 130, 246, 0.24), transparent 60%),
+    radial-gradient(900px 520px at -10% 25%, rgba(34, 211, 238, 0.15), transparent 60%),
+    radial-gradient(700px 400px at 50% 110%, rgba(139, 92, 246, 0.14), transparent 60%),
+    #050b18 !important;
+}
+html[data-theme="light"] body::after {
+  background-image:
+    linear-gradient(rgba(88, 196, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(88, 196, 255, 0.055) 1px, transparent 1px) !important;
+}
 html[data-theme="light"] .city-bg {
   display: block !important;
-  opacity: 0.8 !important;
+  visibility: visible !important;
+  opacity: 0.82 !important;
 }
 html[data-theme="light"] .city-bg.calm {
-  opacity: 0.42 !important;
+  opacity: 0.45 !important;
 }
+
+/* Penyesuaian permukaan kartu & navigasi yang bersih & profesional di mode terang */
 html[data-theme="light"] .site-header {
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.88);
+  border-bottom-color: rgba(15, 76, 129, 0.18);
 }
 html[data-theme="light"] .sgc-topbar {
-  background: rgba(255, 255, 255, 0.86);
-  color: #0b1730;
+  background: rgba(255, 255, 255, 0.90);
+  color: #0f172a;
 }
-html[data-theme="light"] .sgc-page-title {
-  color: #0b1730;
-}
+html[data-theme="light"] .sgc-page-title { color: #0f172a; }
 html[data-theme="light"] .btn-ghost {
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.88);
   color: var(--text);
 }
-html[data-theme="light"] .btn-ghost:hover {
-  background: rgba(3, 105, 161, 0.12);
-}
-html[data-theme="light"] .btn-light {
-  background: rgba(3, 105, 161, 0.1);
-}
-html[data-theme="light"] .btn-light:hover {
-  background: rgba(3, 105, 161, 0.18);
-}
+html[data-theme="light"] .btn-ghost:hover { background: rgba(3, 105, 161, 0.12); }
+html[data-theme="light"] .btn-light { background: rgba(3, 105, 161, 0.10); }
+html[data-theme="light"] .btn-light:hover { background: rgba(3, 105, 161, 0.18); }
 html[data-theme="light"] .card {
-  box-shadow: 0 12px 34px rgba(5, 11, 24, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  box-shadow: 0 14px 36px rgba(5, 11, 24, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.95);
 }
 html[data-theme="light"] .feature:hover {
-  box-shadow: 0 16px 40px rgba(5, 11, 24, 0.42);
+  box-shadow: 0 18px 42px rgba(5, 11, 24, 0.40);
 }
 html[data-theme="light"] .hero h1,
-html[data-theme="light"] .hero .lead {
+html[data-theme="light"] .hero .lead,
+html[data-theme="light"] .auth-visual-copy h2,
+html[data-theme="light"] .auth-visual-copy p {
   color: #e6f1ff;
-  text-shadow: 0 2px 18px rgba(5, 11, 24, 0.9);
+  text-shadow: 0 2px 18px rgba(5, 11, 24, 0.92);
 }
 html[data-theme="light"] .gradient-text {
-  background: linear-gradient(100deg, #0284c7, #2563eb 55%, #6d28d9);
+  background: linear-gradient(100deg, #38bdf8, #60a5fa 55%, #a78bfa);
   -webkit-background-clip: text;
   background-clip: text;
 }
@@ -479,14 +491,8 @@ html[data-theme="light"] .stat .n {
   -webkit-background-clip: text;
   background-clip: text;
 }
-html[data-theme="light"] .auth-visual-copy h2,
-html[data-theme="light"] .auth-visual-copy p {
-  color: #e6f1ff;
-}
 html[data-theme="light"] .field label,
-html[data-theme="light"] .check {
-  color: var(--text);
-}
+html[data-theme="light"] .check { color: var(--text); }
 html[data-theme="light"] input[type="text"],
 html[data-theme="light"] input[type="email"],
 html[data-theme="light"] input[type="password"],
@@ -494,30 +500,27 @@ html[data-theme="light"] input[type="tel"],
 html[data-theme="light"] input[type="number"],
 html[data-theme="light"] select,
 html[data-theme="light"] textarea {
-  background: rgba(255, 255, 255, 0.96);
-  color: #0b1730;
+  background: #ffffff;
+  color: #0f172a;
+  border-color: rgba(15, 76, 129, 0.24);
 }
 html[data-theme="light"] input::placeholder,
-html[data-theme="light"] textarea::placeholder {
-  color: #64748b;
-}
+html[data-theme="light"] textarea::placeholder { color: #64748b; }
 html[data-theme="light"] .alert-error {
   color: #991b1b;
-  background: rgba(220, 38, 38, 0.1);
-  border-color: rgba(220, 38, 38, 0.35);
+  background: rgba(254, 226, 226, 0.92);
+  border-color: rgba(220, 38, 38, 0.4);
 }
 html[data-theme="light"] .alert-ok {
   color: #065f46;
-  background: rgba(5, 150, 105, 0.1);
-  border-color: rgba(5, 150, 105, 0.35);
+  background: rgba(209, 250, 229, 0.92);
+  border-color: rgba(5, 150, 105, 0.4);
 }
 html[data-theme="light"] .alert-info {
   color: #075985;
-  background: rgba(3, 105, 161, 0.1);
+  background: rgba(224, 242, 254, 0.92);
 }
-html[data-theme="light"] .empty {
-  background: rgba(255, 255, 255, 0.82);
-}
+html[data-theme="light"] .empty { background: rgba(255, 255, 255, 0.85); }
 html[data-theme="light"] .badge-baru { color: #1d4ed8; }
 html[data-theme="light"] .badge-diverifikasi { color: #92400e; }
 html[data-theme="light"] .badge-diproses { color: #0e7490; }
@@ -526,20 +529,69 @@ html[data-theme="light"] .badge-ditolak { color: #b91c1c; }
 html[data-theme="light"] .sla-late {
   color: #b91c1c;
   border-color: rgba(220, 38, 38, 0.45);
-  background: rgba(220, 38, 38, 0.08);
+  background: rgba(254, 226, 226, 0.85);
 }
-html[data-theme="light"] .votes { color: #0369a1; }
+html[data-theme="light"] .votes { color: #0284c7; }
 html[data-theme="light"] .stars,
 html[data-theme="light"] .star-input button { color: rgba(82, 102, 132, 0.45); }
 html[data-theme="light"] .stars .on,
 html[data-theme="light"] .star-input button.on { color: #d97706; }
-html[data-theme="light"] .bell-btn { background: rgba(255, 255, 255, 0.9); }
+html[data-theme="light"] .bell-btn { background: rgba(255, 255, 255, 0.92); }
 html[data-theme="light"] .bell-menu { box-shadow: 0 18px 40px rgba(5, 11, 24, 0.35); }
 html[data-theme="light"] .map-box .leaflet-tile-pane { filter: none; }
 html[data-theme="light"] .map-box .leaflet-control-attribution {
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.9);
   color: var(--muted);
 }
 html[data-theme="light"] .bar { background: rgba(3, 105, 161, 0.12); }
 html[data-theme="light"] .loader-bar { background: rgba(3, 105, 161, 0.12); }
 html[data-theme="light"] .timeline li::before { border-color: #ffffff; }
+
+/* =====================================================================
+   Penyempurnaan Tata Letak Profesional Dashboard Kabupaten Purbalingga
+   ===================================================================== */
+.sgc-admin-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 16px 20px;
+  margin-bottom: 18px;
+  border-radius: var(--radius);
+  background: linear-gradient(120deg, rgba(37, 99, 235, 0.22), rgba(14, 165, 233, 0.14));
+  border: 1px solid var(--line-strong);
+}
+.sgc-admin-banner-title {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 1.02rem;
+  margin: 0 0 2px;
+}
+.sgc-admin-banner-sub {
+  font-size: 0.84rem;
+  color: var(--muted);
+  margin: 0;
+}
+.sgc-agency-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  background: rgba(34, 211, 238, 0.14);
+  color: var(--cyan);
+  border: 1px solid var(--line-strong);
+}
+.sgc-form-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+@media (max-width: 900px) {
+  .sgc-form-grid-3 {
+    grid-template-columns: 1fr;
+  }
+}
