@@ -849,3 +849,131 @@ html[data-theme="light"] .sgc-nav button.active {
   color: #0284c7;
   background: rgba(2, 132, 199, 0.12);
 }
+
+
+/* =====================================================================
+   Polish Topbar User Profile, Banner Kontras & Toolbar Mode Terang
+   ===================================================================== */
+.sgc-topbar {
+  padding: 16px 24px;
+  border-radius: 0 0 var(--radius) var(--radius);
+  margin-bottom: 18px;
+}
+
+.sgc-topbar-actions,
+.sgc-user-pill,
+.sgc-user-menu,
+.sgc-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: nowrap;
+}
+
+/* Avatar bulat inisial user (G) di topbar */
+.sgc-avatar,
+.sgc-user-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--cyan), var(--blue));
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+  flex: none;
+}
+
+/* Info nama & role user di topbar */
+.sgc-user-info,
+.sgc-user-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+.sgc-user-name {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+.sgc-user-role {
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+/* Fallback jika struktur HTML topbar-actions merender avatar, nama, role, dan tombol secara langsung */
+.sgc-topbar-actions > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Banner Ringkasan Kinerja Kabupaten Purbalingga */
+.sgc-admin-banner {
+  background: var(--panel);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+}
+.sgc-admin-banner-title {
+  color: var(--text);
+}
+.sgc-admin-banner-sub {
+  color: var(--muted);
+}
+
+html[data-theme="light"] .sgc-admin-banner {
+  background: rgba(255, 255, 255, 0.94);
+  border-color: rgba(3, 105, 161, 0.28);
+  box-shadow: 0 12px 32px rgba(5, 11, 24, 0.28);
+}
+html[data-theme="light"] .sgc-admin-banner-title {
+  color: #0f172a;
+}
+html[data-theme="light"] .sgc-admin-banner-sub {
+  color: #475569;
+}
+html[data-theme="light"] .sgc-agency-pill {
+  background: rgba(2, 132, 199, 0.12);
+  color: #0369a1;
+  border-color: rgba(2, 132, 199, 0.35);
+}
+
+/* Tombol Ekspor CSV di mode terang agar terlihat kontras di atas kota 3D */
+html[data-theme="light"] .toolbar .btn-light {
+  background: rgba(255, 255, 255, 0.94);
+  color: #0369a1;
+  border-color: rgba(3, 105, 161, 0.35);
+  box-shadow: 0 4px 14px rgba(5, 11, 24, 0.2);
+}
+html[data-theme="light"] .toolbar .btn-light:hover {
+  background: #ffffff;
+  color: #0284c7;
+}
+
+/* Sidebar footer & ikon theme toggle */
+.sgc-theme-btn,
+.sgc-icon-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  flex: none;
+}
+html[data-theme="light"] .sgc-theme-btn,
+html[data-theme="light"] .sgc-icon-btn {
+  background: #ffffff;
+  border-color: rgba(15, 76, 129, 0.22);
+  color: #0f172a;
+}
