@@ -595,3 +595,257 @@ html[data-theme="light"] .timeline li::before { border-color: #ffffff; }
     grid-template-columns: 1fr;
   }
 }
+
+
+/* =====================================================================
+   SidebarShell & Dashboard Layout (.sgc-*)
+   ===================================================================== */
+.sgc-shell {
+  display: grid;
+  grid-template-columns: 268px minmax(0, 1fr);
+  min-height: 100vh;
+  position: relative;
+  z-index: 2;
+}
+
+.sgc-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 14px;
+  background: rgba(6, 14, 28, 0.88);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  border-right: 1px solid var(--line);
+  z-index: 40;
+  overflow-y: auto;
+}
+
+.sgc-brand,
+.sgc-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  text-decoration: none;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: 0.03em;
+}
+
+.sgc-brand svg,
+.sgc-sidebar-brand svg,
+.sgc-logo svg {
+  width: 32px !important;
+  height: 32px !important;
+  flex: none;
+}
+
+.sgc-nav,
+.sgc-nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.sgc-nav-item,
+.sgc-nav button,
+.sgc-nav a {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  text-align: left;
+  padding: 11px 13px;
+  border-radius: 11px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.16s ease;
+}
+
+.sgc-nav-item:hover,
+.sgc-nav button:hover,
+.sgc-nav a:hover {
+  color: var(--text);
+  background: rgba(34, 211, 238, 0.08);
+  border-color: var(--line);
+}
+
+.sgc-nav-item.active,
+.sgc-nav-item[aria-current="page"],
+.sgc-nav-item[aria-selected="true"],
+.sgc-nav button.active,
+.sgc-nav button[aria-selected="true"] {
+  color: var(--cyan);
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.16), rgba(59, 130, 246, 0.14));
+  border-color: var(--line-strong);
+  box-shadow: 0 4px 18px rgba(34, 211, 238, 0.14);
+}
+
+/* Kunci ukuran seluruh ikon SVG di dalam sidebar/navigasi agar tidak membesar */
+.sgc-shell svg,
+.sgc-sidebar svg,
+.sgc-nav svg,
+.sgc-nav-item svg,
+.sgc-nav-icon svg,
+.sgc-topbar svg {
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px;
+  max-width: 24px;
+  max-height: 24px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.85;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sgc-nav-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: none;
+}
+
+.sgc-sidebar-footer,
+.sgc-user-box {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+  font-size: 0.84rem;
+}
+
+.sgc-content,
+.sgc-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sgc-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 24px;
+  background: rgba(6, 14, 28, 0.82);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--line);
+}
+
+.sgc-page-title {
+  font-family: var(--display);
+  font-size: 1.18rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.sgc-page-sub {
+  font-size: 0.84rem;
+  color: var(--muted);
+  margin: 2px 0 0;
+}
+
+.sgc-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sgc-main {
+  padding: 24px;
+  width: 100%;
+  max-width: 1360px;
+  margin-inline: auto;
+}
+
+.sgc-burger,
+.sgc-backdrop {
+  display: none;
+}
+
+@media (max-width: 960px) {
+  .sgc-shell {
+    grid-template-columns: 1fr;
+  }
+  .sgc-sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 272px;
+    transform: translateX(-105%);
+    transition: transform 0.24s ease;
+  }
+  .sgc-sidebar.open {
+    transform: translateX(0);
+  }
+  .sgc-burger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    border: 1px solid var(--line-strong);
+    background: rgba(34, 211, 238, 0.08);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .sgc-backdrop.open {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 35;
+  }
+  .sgc-main {
+    padding: 16px;
+  }
+}
+
+/* Mode Terang untuk SidebarShell */
+html[data-theme="light"] .sgc-sidebar {
+  background: rgba(255, 255, 255, 0.92);
+  border-right-color: rgba(15, 76, 129, 0.18);
+}
+html[data-theme="light"] .sgc-nav-item,
+html[data-theme="light"] .sgc-nav button,
+html[data-theme="light"] .sgc-nav a {
+  color: #334155;
+}
+html[data-theme="light"] .sgc-nav-item:hover,
+html[data-theme="light"] .sgc-nav button:hover,
+html[data-theme="light"] .sgc-nav a:hover {
+  color: #0f172a;
+  background: rgba(3, 105, 161, 0.08);
+}
+html[data-theme="light"] .sgc-nav-item.active,
+html[data-theme="light"] .sgc-nav-item[aria-selected="true"],
+html[data-theme="light"] .sgc-nav button.active {
+  color: #0284c7;
+  background: rgba(2, 132, 199, 0.12);
+}
